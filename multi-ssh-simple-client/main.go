@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -83,12 +85,12 @@ func (sshClient *SSH) Connect(mode int) {
 }
 
 // RunCmd function
-func (sshClient *SSH) RunCmd(cmd string) {
+func (sshClient *SSH) RunCmd(cmd string) string {
 	out, err := sshClient.session.CombinedOutput(cmd)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println(string(out))
+	return string(out)
 }
 
 // RefreshSession function
@@ -103,55 +105,59 @@ func (sshClient *SSH) RefreshSession() {
 	sshClient.session = session
 }
 
-// // Shell function
-// func (sshClient *SSH) Shell() {
-// 	modes := ssh.TerminalModes{
-// 		ssh.ECHO:          0,     // disable echoing
-// 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
-// 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
-// 	}
-// 	// Request pseudo terminal
-// 	if err := sshClient.session.RequestPty("xterm", 40, 80, modes); err != nil {
-// 		log.Fatal("request for pseudo terminal failed: ", err)
-// 	}
-// 	err := sshClient.session.Shell()
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-// }
-
 // Close function
 func (sshClient *SSH) Close() {
 	sshClient.session.Close()
 	sshClient.client.Close()
 }
 
-// InteractiveShell function
-func (sshClient *SSH) InteractiveShell() {
+// InputCommand function
+func InputCommand() string {
 	cmd := ""
-	for cmd != "exit\n" {
-		fmt.Printf("[ %v@%v ]# ", sshClient.User, sshClient.IP)
-		reader := bufio.NewReader(os.Stdin)
-		cmd, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-		}
-		sshClient.RunCmd(cmd)
-		sshClient.RefreshSession()
+	fmt.Printf("[ user@hostname ]# ")
+	reader := bufio.NewReader(os.Stdin)
+	cmd, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 	}
+	return cmd
+}
+
+// ConnectAndRunCommandParallel function
+func (sshClient *SSH) ConnectAndRunCommandParallel(cmd string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	sshClient.Connect(CertPassword)
+	sshClient.RefreshSession()
+	output := sshClient.RunCmd(cmd)
+	sshClient.Close()
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		fmt.Printf("%v: %v\n", sshClient.IP, line)
+	}
+	fmt.Println()
 }
 
 // main function
 func main() {
-	client := &SSH{
-		IP:   "csaf-ast-ui.cisco.com",
-		User: "root",
-		Port: 22,
-		Cert: "cisco123",
+	clients := []SSH{
+		{IP: "sprint-rtp-cent.cisco.com", User: "root", Port: 22, Cert: "Cisco1@#"},
+		{IP: "sprint-rtp-cent2.cisco.com", User: "root", Port: 22, Cert: "Cisco1@#"},
+		{IP: "sprint-rtp-cent3.cisco.com", User: "root", Port: 22, Cert: "Cisco1@#"},
 	}
-	client.Connect(CertPassword)
-	client.RefreshSession()
-	client.InteractiveShell()
-	//client.RunCmd("ls /home")
-	client.Close()
+	command := ""
+	var wg sync.WaitGroup
+
+	for true {
+		command = InputCommand()
+		if command == "exit" {
+			break
+		}
+		for i := 0; i < len(clients); i++ {
+			wg.Add(1)
+			go clients[i].ConnectAndRunCommandParallel(command, &wg)
+		}
+		wg.Wait()
+	}
 }
