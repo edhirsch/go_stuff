@@ -10,18 +10,18 @@ import (
 
 // Flow yaml struct
 type Flow struct {
-	sequential bool
-	parallel   bool
-	selection  string
-	iteration  string
+	Sequential bool
+	Parallel   bool
+	Selection  string
+	Iteration  string
 }
 
 // Output yaml struct
 type Output struct {
-	raw      string
-	filter   string
-	filtered string
-	variable string
+	Raw      string
+	Filter   string
+	Filtered string
+	Variable string
 }
 
 // Command yaml struct
@@ -30,8 +30,16 @@ type Command struct {
 	Command    string   `yaml:"command"`
 	Parameters []string `yaml:"parameters"`
 	Depends    string   `yaml:"depends"`
-	Output     Output   `yaml:"output,inline"`
-	Flow       Flow     `yaml:"flow,inline"`
+	Output     Output   `yaml:",flow"`
+	Flow       Flow     `yaml:",flow"`
+}
+
+// Host yaml struct
+type Host struct {
+	Server   string `yaml:"server"`
+	Port     string `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
 }
 
 func main() {

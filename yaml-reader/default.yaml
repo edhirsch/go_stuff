@@ -12,8 +12,8 @@
   flow:
     sequential: true
     parallel: false
-    selection: ""
-    iteration: ""
+    selection: "if"
+    iteration: "for"
     
 - name: "list_processes"
   command: "ps"
@@ -28,5 +28,5 @@
   flow:
     sequential: true
     parallel: false
-    selection: ""
-    iteration: ""
+    selection: "if"
+    iteration: "for"
