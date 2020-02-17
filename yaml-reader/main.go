@@ -21,9 +21,10 @@ import (
 
 // Constants
 const (
-	CertPassword      = 1
-	CertPublicKeyFile = 2
-	DefaultTimeout    = 3 // second
+	CertPassword           = 1
+	CertPublicKeyFile      = 2
+	DefaultTimeout         = 3 // second
+	Debug             bool = false
 )
 
 // AuthType ; CertPassword || CertPublicKeyFile
@@ -32,12 +33,22 @@ var AuthType int
 // Command yaml pre-defined struct
 // ------------------------------------
 type Command struct {
+	Name        string `yaml:"name"`
+	Command     string `yaml:"command"`
+	Description string `yaml:"description"`
+}
+
+// Script yaml pre-defined struct
+// ------------------------------------
+type Script struct {
 	Name       string   `yaml:"name"`
 	Command    string   `yaml:"command"`
-	Parameters []string `yaml:"parameters"`
-	Depends    string   `yaml:"depends"`
-	Output     Output   `yaml:",flow"`
+	Parameters string   `yaml:"parameters"`
+	Depends    []string `yaml:"depends"`
+	Filters    []string `yaml:"filter"`
 	Flow       Flow     `yaml:",flow"`
+	Output     Output
+	ReturnCode int
 }
 
 // Flow yaml struct
@@ -51,12 +62,9 @@ type Flow struct {
 // Output yaml struct
 type Output struct {
 	Raw      string
-	Filter   string
-	Filtered string
-	Variable string
+	Filtered []string
+	Variable []string
 }
-
-// ------------------------------------
 
 // SSH yaml pre-defined structures
 // ------------------------------------
@@ -69,7 +77,31 @@ type SSH struct {
 	client   *ssh.Client
 }
 
-// ------------------------------------
+// MultiSSH pre-defined structure
+type MultiSSH []SSH
+
+// ReadScriptYamlFile function
+func ReadScriptYamlFile(fileName string) ([]Script, error) {
+
+	var yamlConfig []Script
+	yamlFile, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		fmt.Printf("Error reading YAML file: %s\n", err)
+		return yamlConfig, err
+	}
+
+	err = yaml.Unmarshal([]byte(yamlFile), &yamlConfig)
+	if err != nil {
+		fmt.Printf("Error parsing YAML file: %s\n", err)
+		return yamlConfig, err
+	}
+
+	if Debug {
+		fmt.Println(yamlConfig)
+	}
+
+	return yamlConfig, nil
+}
 
 // ReadCommandsYamlFile function
 func ReadCommandsYamlFile(fileName string) ([]Command, error) {
@@ -87,13 +119,17 @@ func ReadCommandsYamlFile(fileName string) ([]Command, error) {
 		return yamlConfig, err
 	}
 
+	if Debug {
+		fmt.Println(yamlConfig)
+	}
+
 	return yamlConfig, nil
 }
 
 // ReadHostsYamlFile function
-func ReadHostsYamlFile(fileName string) ([]SSH, error) {
+func ReadHostsYamlFile(fileName string) (MultiSSH, error) {
 
-	var yamlConfig []SSH
+	var yamlConfig MultiSSH
 	yamlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		fmt.Printf("Error reading YAML file: %s\n", err)
@@ -104,6 +140,10 @@ func ReadHostsYamlFile(fileName string) ([]SSH, error) {
 	if err != nil {
 		fmt.Printf("Error parsing YAML file: %s\n", err)
 		return yamlConfig, err
+	}
+
+	if Debug {
+		fmt.Println(yamlConfig)
 	}
 
 	return yamlConfig, nil
@@ -202,9 +242,9 @@ func (sshClient *SSH) ConnectAndRunCommandParallel(cmd string, wg *sync.WaitGrou
 	sshClient.Close()
 
 	lines := strings.Split(output, "\n")
-	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+4)
+	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Server)+5)
 	fmt.Printf("%v\n", x)
-	fmt.Printf("| %v |\n", sshClient.Server)
+	fmt.Printf("| %v:%v |\n", sshClient.Server, sshClient.Port)
 	fmt.Printf("%v\n", x)
 	for _, line := range lines {
 		fmt.Printf("%v\n", line)
@@ -219,8 +259,8 @@ func getArgs() (string, string, string, error) {
 	return args[0], args[1], strings.Join(args[2:], " "), nil
 }
 
-func matchHost(hostString string, hostsList []SSH) ([]SSH, error) {
-	var foundHosts []SSH
+func matchHost(hostString string, hostsList MultiSSH) (MultiSSH, error) {
+	var foundHosts MultiSSH
 	for i := 0; i < len(hostsList); i++ {
 		matched, err := regexp.MatchString(hostString, hostsList[i].Server)
 		if err == nil {
@@ -246,11 +286,20 @@ func matchCommand(commandString string, commandList []Command) (Command, error) 
 	return foundCommand, errors.New("error: match failed")
 }
 
+// RunCommandOnHosts function
+func (sshClients MultiSSH) RunCommandOnHosts(command string) {
+	var wg sync.WaitGroup
+	for i := 0; i < len(sshClients); i++ {
+		wg.Add(1)
+		go sshClients[i].ConnectAndRunCommandParallel(command, &wg)
+	}
+	wg.Wait()
+}
+
 func main() {
 
 	var yamlHosts = "hosts.yaml"
 	var yamlCommands = "commands.yaml"
-	var wg sync.WaitGroup
 	var execCommand string
 	var matchedCommand Command
 	AuthType = CertPassword
@@ -259,13 +308,11 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	fmt.Printf("%v\n", hosts)
 
 	commands, err := ReadCommandsYamlFile(yamlCommands)
 	if err != nil {
 		os.Exit(2)
 	}
-	fmt.Printf("%v\n", commands)
 
 	hostArg, commandArg, argsArg, err := getArgs()
 	if err != nil {
@@ -277,22 +324,25 @@ func main() {
 		os.Exit(4)
 	}
 
-	if commandArg == "exec" {
+	switch commandArg {
+	case "exec":
 		execCommand = argsArg
-	} else {
-		matchedCommand, err = matchCommand(commandArg, commands)
+		matchedHosts.RunCommandOnHosts(execCommand)
+	case "apply":
+		yamlScript := argsArg
+		script, err := ReadScriptYamlFile(yamlScript)
 		if err != nil {
 			os.Exit(5)
 		}
-	}
-
-	for i := 0; i < len(matchedHosts); i++ {
-		wg.Add(1)
-		if execCommand != "" {
-			go matchedHosts[i].ConnectAndRunCommandParallel(execCommand, &wg)
-		} else {
-			go matchedHosts[i].ConnectAndRunCommandParallel(matchedCommand.Command, &wg)
+		fmt.Println(script)
+	case "list":
+		fmt.Println("Placeholder")
+	default:
+		matchedCommand, err = matchCommand(commandArg, commands)
+		if err != nil {
+			os.Exit(6)
 		}
+		execCommand = matchedCommand.Command
+		matchedHosts.RunCommandOnHosts(execCommand)
 	}
-	wg.Wait()
 }
