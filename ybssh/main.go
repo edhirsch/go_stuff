@@ -8,7 +8,9 @@ import (
 	"log"
 	"net"
 	"os"
+	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -33,35 +35,42 @@ var AuthType int
 // Command yaml pre-defined struct
 // ------------------------------------
 type Command struct {
-	Name        string `yaml:"name"`
-	Command     string `yaml:"command"`
-	Description string `yaml:"description"`
+	Name        string   `yaml:"name"`
+	Command     string   `yaml:"command"`
+	Description string   `yaml:"description"`
+	Filters     []Filter `yaml:",flow"`
+}
+
+// Filter yaml struct
+type Filter struct {
+	RegEx string
+	Save  string
 }
 
 // Script yaml pre-defined struct
 // ------------------------------------
 type Script struct {
-	Name       string   `yaml:"name"`
-	Command    string   `yaml:"command"`
-	Parameters string   `yaml:"parameters"`
-	Depends    []string `yaml:"depends"`
-	Filters    []string `yaml:"filter"`
-	Flow       Flow     `yaml:",flow"`
-	Output     Output
-	ReturnCode int
+	Name string `yaml:"name"`
+	Next Next   `yaml:",flow"`
 }
 
-// Flow yaml struct
-type Flow struct {
-	Sequential bool
-	Parallel   bool
-	Selection  string
-	Iteration  string
+// Next yaml struct
+type Next struct {
+	Run  string `yaml:"run"`
+	Loop struct {
+		Repeat int
+		Break  string
+		Next   string
+	}
+	If []struct {
+		Condition string
+		Next      string
+	}
 }
 
 // Output yaml struct
 type Output struct {
-	Raw      string
+	Stdout   string
 	Filtered []string
 	Variable []string
 }
@@ -220,18 +229,6 @@ func (sshClient *SSH) Close() {
 	sshClient.client.Close()
 }
 
-// InputCommand function
-func InputCommand() string {
-	cmd := ""
-	fmt.Printf("[ user@hostname ]# ")
-	reader := bufio.NewReader(os.Stdin)
-	cmd, err := reader.ReadString('\n')
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-	return cmd
-}
-
 // ConnectAndRunCommandParallel function
 func (sshClient *SSH) ConnectAndRunCommandParallel(cmd string, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -242,13 +239,35 @@ func (sshClient *SSH) ConnectAndRunCommandParallel(cmd string, wg *sync.WaitGrou
 	sshClient.Close()
 
 	lines := strings.Split(output, "\n")
-	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Server)+5)
+	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+5)
 	fmt.Printf("%v\n", x)
 	fmt.Printf("| %v:%v |\n", sshClient.Server, sshClient.Port)
 	fmt.Printf("%v\n", x)
 	for _, line := range lines {
 		fmt.Printf("%v\n", line)
 	}
+}
+
+// RunCommandOnHosts function
+func (sshClients MultiSSH) RunCommandOnHosts(command string) {
+	var wg sync.WaitGroup
+	for i := 0; i < len(sshClients); i++ {
+		wg.Add(1)
+		go sshClients[i].ConnectAndRunCommandParallel(command, &wg)
+	}
+	wg.Wait()
+}
+
+// InputCommand function
+func InputCommand() string {
+	cmd := ""
+	fmt.Printf("[ user@hostname ]# ")
+	reader := bufio.NewReader(os.Stdin)
+	cmd, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	return cmd
 }
 
 func getArgs() (string, string, string, error) {
@@ -277,8 +296,12 @@ func matchHost(hostString string, hostsList MultiSSH) (MultiSSH, error) {
 
 func matchCommand(commandString string, commandList []Command) (Command, error) {
 	var foundCommand Command
+	commandLabels := strings.Fields(commandString)
+	sort.Strings(commandLabels)
 	for i := 0; i < len(commandList); i++ {
-		if commandList[i].Name == commandString {
+		commandListLabels := strings.Fields(commandList[i].Name)
+		sort.Strings(commandListLabels)
+		if reflect.DeepEqual(commandListLabels, commandLabels) == true {
 			foundCommand = commandList[i]
 			return foundCommand, nil
 		}
@@ -286,20 +309,20 @@ func matchCommand(commandString string, commandList []Command) (Command, error) 
 	return foundCommand, errors.New("error: match failed")
 }
 
-// RunCommandOnHosts function
-func (sshClients MultiSSH) RunCommandOnHosts(command string) {
-	var wg sync.WaitGroup
-	for i := 0; i < len(sshClients); i++ {
-		wg.Add(1)
-		go sshClients[i].ConnectAndRunCommandParallel(command, &wg)
-	}
-	wg.Wait()
+func showHelp() {
+	help := `Usage :
+	ybssh <hosts> <command labels>
+	ybssh <hosts> --exec <command>
+	ybssh <hosts> --script <script.yaml>
+	`
+	fmt.Println(help)
 }
 
 func main() {
 
 	var yamlHosts = "hosts.yaml"
 	var yamlCommands = "commands.yaml"
+	var fullCommand string
 	var execCommand string
 	var matchedCommand Command
 	AuthType = CertPassword
@@ -316,8 +339,11 @@ func main() {
 
 	hostArg, commandArg, argsArg, err := getArgs()
 	if err != nil {
+		fmt.Println(err)
+		showHelp()
 		os.Exit(3)
 	}
+	fullCommand = commandArg + " " + argsArg
 
 	matchedHosts, err := matchHost(hostArg, hosts)
 	if err != nil {
@@ -325,22 +351,27 @@ func main() {
 	}
 
 	switch commandArg {
-	case "exec":
+	case "--exec":
 		execCommand = argsArg
 		matchedHosts.RunCommandOnHosts(execCommand)
-	case "apply":
+	case "--apply":
 		yamlScript := argsArg
 		script, err := ReadScriptYamlFile(yamlScript)
 		if err != nil {
 			os.Exit(5)
 		}
 		fmt.Println(script)
-	case "list":
+	case "--list":
 		fmt.Println("Placeholder")
 	default:
-		matchedCommand, err = matchCommand(commandArg, commands)
+		matchedCommand, err = matchCommand(fullCommand, commands)
 		if err != nil {
-			os.Exit(6)
+			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
+			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", yamlCommands)
+			fmt.Printf("For running one time commands, you can use :\n")
+			fmt.Printf("ybssh --exec '%v'\n\n", fullCommand)
+
+			break
 		}
 		execCommand = matchedCommand.Command
 		matchedHosts.RunCommandOnHosts(execCommand)

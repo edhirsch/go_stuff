@@ -1,10 +1,21 @@
-- name: "list_files_home_folder"
-  command: "list_files"
-  parameters: "/home"
-  depends:
-  filters:
-  flow:
-    sequential: true
-    parallel: false
-    selection: "if"
-    iteration: "for"
+- name: "list files"
+  next:
+    run: "get root fs usage"
+    loop:
+      repeat: 99
+      break: "myVar == 99"
+      next: "get root fs usage"
+    if:
+      - condition: "myVar == 98"
+        next: "get root fs usage"
+
+- name: "get root fs usage"
+  next:
+    run: "list files"
+    loop:
+      repeat: 99
+      break: "myVar == 99"
+      next: "list files"
+    if:
+      - condition: "myVar == 98"
+        next: "list files"

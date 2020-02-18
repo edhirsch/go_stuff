@@ -1,32 +1,25 @@
-- name: "list_files"
-  command: "ls"
-  parameters:
-    - -l
-    - -h
-  depends: "nobody"
-  output:
-    raw: "1234567890"
-    filter: "..."
-    filtered: "123"
-    variable: "ls3"
-  flow:
-    sequential: true
-    parallel: false
-    selection: "if"
-    iteration: "for"
-    
-- name: "list_processes"
-  command: "ps"
-  parameters:
-    - aux
-  depends: "nobody"
-  output:
-    raw: '1\n\2\n3\n4'
-    filter: "."
-    filtered: "1"
-    variable: "pid1"
-  flow:
-    sequential: true
-    parallel: false
-    selection: "if"
-    iteration: "for"
+- name: "echo 123"
+  command: "echo 123"
+  filters:
+  - regex: 
+    save:
+
+- name: "echo 456"
+  command: "echo 456"
+  filters:
+  - regex: 
+    save:
+
+- name: "echo 789"
+  command: "echo 789"
+  filters:
+  - regex: 
+    save:
+
+- name: "echo 000"
+  command: "echo 000"
+  filters:
+  - regex: 
+    save:
+
+
