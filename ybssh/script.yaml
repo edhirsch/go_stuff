@@ -1,21 +1,19 @@
-- name: "list files"
-  next:
-    run: "get root fs usage"
-    loop:
-      repeat: 99
-      break: "myVar == 99"
-      next: "get root fs usage"
-    if:
-      - condition: "myVar == 98"
-        next: "get root fs usage"
+- name: "1st echo"
+  command: "echo 123"
+  loop:
+    repeat: 3
+    break: "myVar == 123"
+    next: "echo 456"
+  run:
+    - next: "echo 789"
+      condition: "myVar == 456"
 
-- name: "get root fs usage"
-  next:
-    run: "list files"
-    loop:
-      repeat: 99
-      break: "myVar == 99"
-      next: "list files"
-    if:
-      - condition: "myVar == 98"
-        next: "list files"
+- name: "2nd echo"
+  command: "echo 456"
+  loop:
+    repeat: 5
+    break: "myVar == 456"
+    next: "echo 789"
+  run:
+    - next: "echo 789"
+      condition: "myVar == 789"

@@ -1,23 +1,27 @@
 - name: "echo 123"
   command: "echo 123"
+  description: "print number 123"
   filters:
   - regex: 
     save:
 
 - name: "echo 456"
   command: "echo 456"
+  description: "print number 456"
   filters:
   - regex: 
     save:
 
 - name: "echo 789"
   command: "echo 789"
+  description: "print number 789"
   filters:
   - regex: 
     save:
 
 - name: "echo 000"
   command: "echo 000"
+  description: "print number 0"
   filters:
   - regex: 
     save:

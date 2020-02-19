@@ -50,29 +50,34 @@ type Filter struct {
 // Script yaml pre-defined struct
 // ------------------------------------
 type Script struct {
-	Name string `yaml:"name"`
-	Next Next   `yaml:",flow"`
+	Name    string `yaml:"name"`
+	Command string `yaml:"command"`
+	Loop    Loop   `yaml:",flow"`
+	Next    []Next `yaml:",flow"`
+	Output  Output
 }
 
-// Next yaml struct
+// Next yaml pre-defined struct
 type Next struct {
-	Run  string `yaml:"run"`
-	Loop struct {
-		Repeat int
-		Break  string
-		Next   string
-	}
-	If []struct {
-		Condition string
-		Next      string
-	}
+	Condition string
+	Run       string
+}
+
+// Loop yaml struct
+type Loop struct {
+	Repeat int
+	Break  string
+	Next   string
 }
 
 // Output yaml struct
 type Output struct {
 	Stdout   string
-	Filtered []string
-	Variable []string
+	Stderr   string
+	Variable struct {
+		Name  string
+		Value string
+	}
 }
 
 // SSH yaml pre-defined structures
@@ -294,8 +299,9 @@ func matchHost(hostString string, hostsList MultiSSH) (MultiSSH, error) {
 	return foundHosts, nil
 }
 
-func matchCommand(commandString string, commandList []Command) (Command, error) {
+func matchCommand(commandString string, commandList []Command) (Command, []Command, error) {
 	var foundCommand Command
+	var matchedPartial []Command
 	commandLabels := strings.Fields(commandString)
 	sort.Strings(commandLabels)
 	for i := 0; i < len(commandList); i++ {
@@ -303,10 +309,32 @@ func matchCommand(commandString string, commandList []Command) (Command, error) 
 		sort.Strings(commandListLabels)
 		if reflect.DeepEqual(commandListLabels, commandLabels) == true {
 			foundCommand = commandList[i]
-			return foundCommand, nil
+		} else {
+			if matchArrayInArray(commandLabels, commandListLabels) == true {
+				matchedPartial = append(matchedPartial, commandList[i])
+			}
 		}
 	}
-	return foundCommand, errors.New("error: match failed")
+	if foundCommand.Name != "" || len(matchedPartial) > 0 {
+		return foundCommand, matchedPartial, nil
+	}
+	return foundCommand, matchedPartial, errors.New("error: match failed")
+}
+
+func matchArrayInArray(array1 []string, array2 []string) bool {
+	matched := 0
+	for i := 0; i < len(array1); i++ {
+		for j := 0; j < len(array2); j++ {
+			if array1[i] == array2[j] {
+				matched++
+				continue
+			}
+		}
+	}
+	if matched != len(array1) {
+		return false
+	}
+	return true
 }
 
 func showHelp() {
@@ -324,7 +352,6 @@ func main() {
 	var yamlCommands = "commands.yaml"
 	var fullCommand string
 	var execCommand string
-	var matchedCommand Command
 	AuthType = CertPassword
 
 	hosts, err := ReadHostsYamlFile(yamlHosts)
@@ -339,8 +366,8 @@ func main() {
 
 	hostArg, commandArg, argsArg, err := getArgs()
 	if err != nil {
-		fmt.Println(err)
 		showHelp()
+		fmt.Println(err)
 		os.Exit(3)
 	}
 	fullCommand = commandArg + " " + argsArg
@@ -364,13 +391,20 @@ func main() {
 	case "--list":
 		fmt.Println("Placeholder")
 	default:
-		matchedCommand, err = matchCommand(fullCommand, commands)
+		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
 		if err != nil {
 			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
 			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", yamlCommands)
 			fmt.Printf("For running one time commands, you can use :\n")
 			fmt.Printf("ybssh --exec '%v'\n\n", fullCommand)
-
+			break
+		}
+		if len(partialCommands) > 0 {
+			fmt.Printf("Did you mean ..\n")
+			for i := 0; i < len(partialCommands); i++ {
+				fmt.Printf("\t%v\t%v\t%v\n", partialCommands[i].Name, partialCommands[i].Command, partialCommands[i].Description)
+			}
+			fmt.Println()
 			break
 		}
 		execCommand = matchedCommand.Command
