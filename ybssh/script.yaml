@@ -1,19 +1,42 @@
-- name: "1st echo"
-  command: "echo 123"
+- id: 1
+  command: "echo 1"
+  loop:
+    repeat: 1
+    break: "myVar == 1"
+  next:
+    - run: 2
+      condition: "myVar == 2"
+
+- id: 2
+  command: "echo 2"
+  loop:
+    repeat: 2
+    break: "myVar == 2"
+  next:
+    - run: 3
+      condition: "myVar == 2"
+
+- id: 3
+  command: "echo 3"
   loop:
     repeat: 3
-    break: "myVar == 123"
-    next: "echo 456"
-  run:
-    - next: "echo 789"
-      condition: "myVar == 456"
+    break: "myVar == 3"
+  next:
+  - run: 4
+    condition: "myVar == 2"
+  - run: 5
+    condition: "myVar == 2"
 
-- name: "2nd echo"
-  command: "echo 456"
+- id: 4
+  command: "echo 4"
   loop:
-    repeat: 5
-    break: "myVar == 456"
-    next: "echo 789"
-  run:
-    - next: "echo 789"
-      condition: "myVar == 789"
+    repeat: 4
+    break: "myVar == 4"
+
+- id: 5
+  command: "echo 5"
+  loop:
+    repeat: 4
+    break: "myVar == 4"
+
+

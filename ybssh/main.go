@@ -32,6 +32,9 @@ const (
 // AuthType ; CertPassword || CertPublicKeyFile
 var AuthType int
 
+// Variables global
+var Variables []Variable
+
 // Command yaml pre-defined struct
 // ------------------------------------
 type Command struct {
@@ -50,24 +53,24 @@ type Filter struct {
 // Script yaml pre-defined struct
 // ------------------------------------
 type Script struct {
-	Name    string `yaml:"name"`
-	Command string `yaml:"command"`
-	Loop    Loop   `yaml:",flow"`
-	Next    []Next `yaml:",flow"`
-	Output  Output
+	ID         int    `yaml:"id"`
+	Command    string `yaml:"command"`
+	Loop       Loop   `yaml:",flow"`
+	Next       []Next `yaml:",flow"`
+	Output     Output
+	ReturnCode int
 }
 
 // Next yaml pre-defined struct
 type Next struct {
 	Condition string
-	Run       string
+	Run       int
 }
 
 // Loop yaml struct
 type Loop struct {
 	Repeat int
 	Break  string
-	Next   string
 }
 
 // Output yaml struct
@@ -78,6 +81,12 @@ type Output struct {
 		Name  string
 		Value string
 	}
+}
+
+// Variable struct
+type Variable struct {
+	Name  string
+	Value string
 }
 
 // SSH yaml pre-defined structures
@@ -251,6 +260,10 @@ func (sshClient *SSH) ConnectAndRunCommandParallel(cmd string, wg *sync.WaitGrou
 	for _, line := range lines {
 		fmt.Printf("%v\n", line)
 	}
+	var setVar Variable
+	setVar.Name = sshClient.Server + ":" + sshClient.Port + ".'" + cmd + "'.output"
+	setVar.Value = output
+	Variables = append(Variables, setVar)
 }
 
 // RunCommandOnHosts function
@@ -261,6 +274,29 @@ func (sshClients MultiSSH) RunCommandOnHosts(command string) {
 		go sshClients[i].ConnectAndRunCommandParallel(command, &wg)
 	}
 	wg.Wait()
+}
+
+// RunScriptOnHosts function
+func (sshClients MultiSSH) RunScriptOnHosts(scripts []Script, id int) {
+	var wg sync.WaitGroup
+	var script Script
+
+	for i := 0; i < len(scripts); i++ {
+		if scripts[i].ID == id {
+			script = scripts[i]
+		}
+	}
+
+	for i := 0; i < len(sshClients); i++ {
+		wg.Add(1)
+		go sshClients[i].ConnectAndRunCommandParallel(script.Command, &wg)
+	}
+	wg.Wait()
+	if len(script.Next) > 0 {
+		for j := 0; j < len(script.Next); j++ {
+			sshClients.RunScriptOnHosts(scripts, script.Next[j].Run)
+		}
+	}
 }
 
 // InputCommand function
@@ -348,7 +384,7 @@ func showHelp() {
 
 func main() {
 
-	var yamlHosts = "hosts.yaml"
+	var yamlHosts = "hosts_local.yaml"
 	var yamlCommands = "commands.yaml"
 	var fullCommand string
 	var execCommand string
@@ -388,6 +424,10 @@ func main() {
 			os.Exit(5)
 		}
 		fmt.Println(script)
+		matchedHosts.RunScriptOnHosts(script, 1)
+		for v := 0; v < len(Variables); v++ {
+			fmt.Printf("%v: %v", Variables[v].Name, Variables[v].Value)
+		}
 	case "--list":
 		fmt.Println("Placeholder")
 	default:
