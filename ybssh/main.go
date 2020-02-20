@@ -219,6 +219,7 @@ func (sshClient *SSH) Connect(mode int) {
 func (sshClient *SSH) RunCmd(cmd string, wg *sync.WaitGroup) {
 	// defer wg.Done()
 	var setVar Variable
+	fmt.Printf("Running command %v\n", cmd)
 	out, err := sshClient.session.CombinedOutput(cmd)
 	if err != nil {
 		fmt.Println(err)
@@ -282,20 +283,27 @@ func (sshClient *SSH) Close() {
 
 // FindAndRunScript function
 func (sshClient *SSH) FindAndRunScript(scripts []Script, id int, wg *sync.WaitGroup) {
+	fmt.Printf("Deferring wg.\n")
 	defer wg.Done()
+	fmt.Printf("Adding wg.\n")
 	wg.Add(1)
 	//fmt.Printf("go routines no. = %v\n", runtime.NumGoroutine())
 	var script Script
+	fmt.Printf("Searching for command id %v.\n", id)
 	for i := 0; i < len(scripts); i++ {
 		if scripts[i].ID == id {
+			fmt.Printf("Found command id %v.\n", id)
 			script = scripts[i]
 			break
 		}
 	}
+	fmt.Printf("Refreshing ssh session.\n")
 	sshClient.RefreshSession()
+	fmt.Printf("Starting go routine for command id %v.\n", id)
 	go sshClient.RunCmd(script.Command, wg)
 	if len(script.Next) > 0 {
 		for j := 0; j < len(script.Next); j++ {
+			fmt.Printf("Starting next %v.\n", id)
 			sshClient.FindAndRunScript(scripts, script.Next[j].Run, wg)
 		}
 	}
