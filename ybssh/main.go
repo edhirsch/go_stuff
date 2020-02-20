@@ -14,7 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"gopkg.in/yaml.v2"
 
@@ -217,12 +216,17 @@ func (sshClient *SSH) Connect(mode int) {
 }
 
 // RunCmd function
-func (sshClient *SSH) RunCmd(cmd string) string {
+func (sshClient *SSH) RunCmd(cmd string, wg *sync.WaitGroup) {
+	// defer wg.Done()
+	var setVar Variable
 	out, err := sshClient.session.CombinedOutput(cmd)
 	if err != nil {
 		fmt.Println(err)
 	}
-	return string(out)
+	setVar.Name = sshClient.Server + ":" + sshClient.Port + ".'" + cmd + "'.output"
+	setVar.Value = string(out)
+	Variables = append(Variables, setVar)
+	fmt.Printf("%v:%v", setVar.Name, setVar.Value)
 }
 
 // RefreshSession function
@@ -243,59 +247,77 @@ func (sshClient *SSH) Close() {
 	sshClient.client.Close()
 }
 
-// ConnectAndRunCommandParallel function
-func (sshClient *SSH) ConnectAndRunCommandParallel(cmd string, wg *sync.WaitGroup) {
+// // ConnectAndRunCommandParallel function
+// func (sshClient *SSH) ConnectAndRunCommandParallel(cmd string, wg *sync.WaitGroup) {
+// 	defer wg.Done()
+
+// 	sshClient.Connect(AuthType)
+// 	sshClient.RefreshSession()
+// 	output := sshClient.RunCmd(cmd, wg)
+// 	sshClient.Close()
+
+// 	lines := strings.Split(output, "\n")
+// 	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+5)
+// 	fmt.Printf("%v\n", x)
+// 	fmt.Printf("| %v:%v |\n", sshClient.Server, sshClient.Port)
+// 	fmt.Printf("%v\n", x)
+// 	for _, line := range lines {
+// 		fmt.Printf("%v\n", line)
+// 	}
+// 	var setVar Variable
+// 	setVar.Name = sshClient.Server + ":" + sshClient.Port + ".'" + cmd + "'.output"
+// 	setVar.Value = output
+// 	Variables = append(Variables, setVar)
+// }
+
+// // RunCommandOnHosts function
+// func (sshClients MultiSSH) RunCommandOnHosts(command string) {
+// 	var wg sync.WaitGroup
+// 	for i := 0; i < len(sshClients); i++ {
+// 		wg.Add(1)
+// 		go sshClients[i].ConnectAndRunCommandParallel(command, &wg)
+// 	}
+// 	wg.Wait()
+// }
+
+// FindAndRunScript function
+func (sshClient *SSH) FindAndRunScript(scripts []Script, id int, wg *sync.WaitGroup) {
 	defer wg.Done()
-
-	sshClient.Connect(AuthType)
-	sshClient.RefreshSession()
-	output := sshClient.RunCmd(cmd)
-	sshClient.Close()
-
-	lines := strings.Split(output, "\n")
-	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+5)
-	fmt.Printf("%v\n", x)
-	fmt.Printf("| %v:%v |\n", sshClient.Server, sshClient.Port)
-	fmt.Printf("%v\n", x)
-	for _, line := range lines {
-		fmt.Printf("%v\n", line)
-	}
-	var setVar Variable
-	setVar.Name = sshClient.Server + ":" + sshClient.Port + ".'" + cmd + "'.output"
-	setVar.Value = output
-	Variables = append(Variables, setVar)
-}
-
-// RunCommandOnHosts function
-func (sshClients MultiSSH) RunCommandOnHosts(command string) {
-	var wg sync.WaitGroup
-	for i := 0; i < len(sshClients); i++ {
-		wg.Add(1)
-		go sshClients[i].ConnectAndRunCommandParallel(command, &wg)
-	}
-	wg.Wait()
-}
-
-// RunScriptOnHosts function
-func (sshClients MultiSSH) RunScriptOnHosts(scripts []Script, id int) {
-	var wg sync.WaitGroup
+	wg.Add(1)
+	//fmt.Printf("go routines no. = %v\n", runtime.NumGoroutine())
 	var script Script
-
 	for i := 0; i < len(scripts); i++ {
 		if scripts[i].ID == id {
 			script = scripts[i]
+			break
 		}
 	}
-
-	for i := 0; i < len(sshClients); i++ {
-		wg.Add(1)
-		go sshClients[i].ConnectAndRunCommandParallel(script.Command, &wg)
-	}
-	wg.Wait()
+	sshClient.RefreshSession()
+	go sshClient.RunCmd(script.Command, wg)
 	if len(script.Next) > 0 {
 		for j := 0; j < len(script.Next); j++ {
-			sshClients.RunScriptOnHosts(scripts, script.Next[j].Run)
+			sshClient.FindAndRunScript(scripts, script.Next[j].Run, wg)
 		}
+	}
+}
+
+// RunScriptOnHosts function
+func (sshClients MultiSSH) RunScriptOnHosts(scripts []Script) {
+	fmt.Printf("Creating wg slice.\n")
+	wg := make([]sync.WaitGroup, len(sshClients))
+	for i := 0; i < len(sshClients); i++ {
+		fmt.Printf("Connecting to ssh client no. %v.\n", i+1)
+		sshClients[i].Connect(AuthType)
+		fmt.Printf("Starting go routine no. %v\n", i+1)
+		go sshClients[i].FindAndRunScript(scripts, 1, &wg[i])
+	}
+	for i := 0; i < len(sshClients); i++ {
+		fmt.Printf("Waiting for wg %v to end.\n", i+1)
+		wg[i].Wait()
+	}
+	for i := 0; i < len(sshClients); i++ {
+		fmt.Printf("Closing ssh client connection no. %v.\n", i+1)
+		sshClients[i].Close()
 	}
 }
 
@@ -384,10 +406,10 @@ func showHelp() {
 
 func main() {
 
-	var yamlHosts = "hosts_local.yaml"
+	var yamlHosts = "hosts.yaml"
 	var yamlCommands = "commands.yaml"
 	var fullCommand string
-	var execCommand string
+	// var execCommand string
 	AuthType = CertPassword
 
 	hosts, err := ReadHostsYamlFile(yamlHosts)
@@ -399,6 +421,7 @@ func main() {
 	if err != nil {
 		os.Exit(2)
 	}
+	fmt.Println(commands)
 
 	hostArg, commandArg, argsArg, err := getArgs()
 	if err != nil {
@@ -407,6 +430,7 @@ func main() {
 		os.Exit(3)
 	}
 	fullCommand = commandArg + " " + argsArg
+	fmt.Println(fullCommand)
 
 	matchedHosts, err := matchHost(hostArg, hosts)
 	if err != nil {
@@ -414,9 +438,9 @@ func main() {
 	}
 
 	switch commandArg {
-	case "--exec":
-		execCommand = argsArg
-		matchedHosts.RunCommandOnHosts(execCommand)
+	// case "--exec":
+	// 	execCommand = argsArg
+	// 	matchedHosts.RunCommandOnHosts(execCommand)
 	case "--apply":
 		yamlScript := argsArg
 		script, err := ReadScriptYamlFile(yamlScript)
@@ -424,30 +448,30 @@ func main() {
 			os.Exit(5)
 		}
 		fmt.Println(script)
-		matchedHosts.RunScriptOnHosts(script, 1)
+		matchedHosts.RunScriptOnHosts(script)
 		for v := 0; v < len(Variables); v++ {
 			fmt.Printf("%v: %v", Variables[v].Name, Variables[v].Value)
 		}
-	case "--list":
-		fmt.Println("Placeholder")
-	default:
-		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
-		if err != nil {
-			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
-			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", yamlCommands)
-			fmt.Printf("For running one time commands, you can use :\n")
-			fmt.Printf("ybssh --exec '%v'\n\n", fullCommand)
-			break
-		}
-		if len(partialCommands) > 0 {
-			fmt.Printf("Did you mean ..\n")
-			for i := 0; i < len(partialCommands); i++ {
-				fmt.Printf("\t%v\t%v\t%v\n", partialCommands[i].Name, partialCommands[i].Command, partialCommands[i].Description)
-			}
-			fmt.Println()
-			break
-		}
-		execCommand = matchedCommand.Command
-		matchedHosts.RunCommandOnHosts(execCommand)
+		// case "--list":
+		// 	fmt.Println("Placeholder")
+		// default:
+		// 	matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
+		// 	if err != nil {
+		// 		fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
+		// 		fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", yamlCommands)
+		// 		fmt.Printf("For running one time commands, you can use :\n")
+		// 		fmt.Printf("ybssh --exec '%v'\n\n", fullCommand)
+		// 		break
+		// 	}
+		// 	if len(partialCommands) > 0 {
+		// 		fmt.Printf("Did you mean ..\n")
+		// 		for i := 0; i < len(partialCommands); i++ {
+		// 			fmt.Printf("\t%v\t%v\t%v\n", partialCommands[i].Name, partialCommands[i].Command, partialCommands[i].Description)
+		// 		}
+		// 		fmt.Println()
+		// 		break
+		// 	}
+		// 	execCommand = matchedCommand.Command
+		// 	matchedHosts.RunCommandOnHosts(execCommand)
 	}
 }

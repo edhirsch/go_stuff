@@ -7,7 +7,7 @@
 
 - name: "echo 1"
   command: "echo 1"
-  description: "pint number 1"
+  description: "print number 1"
   filters:
   - regex: 
     save:
