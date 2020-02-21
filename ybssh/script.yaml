@@ -1,7 +1,7 @@
 - id: 1
   command: "echo 1"
   loop:
-    repeat: 1
+    repeat: 0
     break: "myVar == 1"
   next:
     - run: 2
@@ -10,7 +10,7 @@
 - id: 2
   command: "echo 2"
   loop:
-    repeat: 2
+    repeat: 1
     break: "myVar == 2"
   next:
     - run: 3
@@ -19,7 +19,7 @@
 - id: 3
   command: "echo 3"
   loop:
-    repeat: 3
+    repeat: 2
     break: "myVar == 3"
   next:
 

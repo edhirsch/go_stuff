@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"text/tabwriter"
 	"time"
 	"unicode/utf8"
 
@@ -27,6 +28,9 @@ const (
 	DefaultTimeout         = 3 // second
 	Debug             bool = false
 )
+
+// Banner ; true to show server name/command banner ; false to skip
+var Banner = true
 
 // AuthType ; CertPassword || CertPublicKeyFile
 var AuthType int
@@ -251,15 +255,26 @@ func (sshClient *SSH) Close() {
 
 // PrintCommandOutput function
 func (sshClient *SSH) PrintCommandOutput(output string, command string) {
+	if Banner == true {
+		x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+
+			utf8.RuneCountInString(command)+7)
+		fmt.Printf("%v\n", x)
+		fmt.Printf("| %v:%v; %v |\n", sshClient.Server, sshClient.Port, command)
+		fmt.Printf("%v\n", x)
+	}
 	lines := strings.Split(output, "\n")
-	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+
-		utf8.RuneCountInString(command)+7)
-	fmt.Printf("%v\n", x)
-	fmt.Printf("| %v:%v; %v |\n", sshClient.Server, sshClient.Port, command)
-	fmt.Printf("%v\n", x)
 	for _, line := range lines {
 		fmt.Printf("%v\n", line)
 	}
+}
+
+// PrintTabbedTable function
+func PrintTabbedTable(lines []string) {
+	writer := tabwriter.NewWriter(os.Stdout, 20, 8, 1, '\t', tabwriter.AlignRight)
+	for i := 0; i < len(lines); i++ {
+		fmt.Fprintln(writer, lines[i])
+	}
+	writer.Flush()
 }
 
 // FindAndRunScript function
@@ -268,21 +283,27 @@ func (sshClient *SSH) FindAndRunScript(scripts []Script, wg *sync.WaitGroup) {
 	var id []int
 	id = append(id, 1)
 	var script Script
+	// itterate and run all commands in the command ID splice, starting from command ID 1
 	for len(id) > 0 {
-		for k := 0; k < len(id); k++ {
-			for i := 0; i < len(scripts); i++ {
-				if scripts[i].ID == id[k] {
-					script = scripts[i]
+		for i := 0; i < len(id); i++ {
+			for j := 0; j < len(scripts); j++ {
+				if scripts[j].ID == id[i] {
+					script = scripts[j]
 					break
 				}
 			}
+			// remove the already selected command ID from the queue
 			id = id[1:]
-			sshClient.RefreshSession()
-			cmdOutput := sshClient.RunCmd(script.Command)
-			sshClient.PrintCommandOutput(cmdOutput, script.Command)
+			// run the command once and again for the value of 'repeat' or the condition is satisfied
+			for r := 0; r <= script.Loop.Repeat; r++ {
+				sshClient.RefreshSession()
+				cmdOutput := sshClient.RunCmd(script.Command)
+				sshClient.PrintCommandOutput(cmdOutput, script.Command)
+			}
+			// add all next command IDs to the commands queue if the condition passes
 			if len(script.Next) > 0 {
-				for j := 0; j < len(script.Next); j++ {
-					id = append(id, script.Next[j].Run)
+				for k := 0; k < len(script.Next); k++ {
+					id = append(id, script.Next[k].Run)
 				}
 			}
 		}
@@ -441,8 +462,13 @@ func main() {
 		for v := 0; v < len(Variables); v++ {
 			fmt.Printf("%v: %v", Variables[v].Name, Variables[v].Value)
 		}
-	// case "--list":
-	// 	fmt.Println("Placeholder")
+	case "--list":
+		Banner = false
+		matchedCommand, _, err := matchCommand("list nodes", commands)
+		if err != nil {
+			os.Exit(6)
+		}
+		matchedHosts.RunCommandOnHosts(matchedCommand.Command)
 	default:
 		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
 		if err != nil {
@@ -453,10 +479,14 @@ func main() {
 			break
 		}
 		if len(partialCommands) > 0 {
-			fmt.Printf("Did you mean ..\n")
+			fmt.Printf("Matched the following command labels :\n\n")
+			var lines []string
+			lines = append(lines, "LABELS\tCOMMAND\tDESCRIPTION")
 			for i := 0; i < len(partialCommands); i++ {
-				fmt.Printf("\t%v\t%v\t%v\n", partialCommands[i].Name, partialCommands[i].Command, partialCommands[i].Description)
+				line := fmt.Sprintf("%v\t%v\t%v", partialCommands[i].Name, partialCommands[i].Command, partialCommands[i].Description)
+				lines = append(lines, line)
 			}
+			PrintTabbedTable(lines)
 			fmt.Println()
 			break
 		}
