@@ -1,0 +1,111 @@
+- name: "echo 0"
+  command: "echo 0"
+  description: "print number 0"
+  filters:
+  - regex: 
+    save:
+
+- name: "echo 1"
+  command: "echo 1"
+  description: "print number 1"
+  filters:
+  - regex: 
+    save:
+
+- name: "echo 2"
+  command: "echo 2"
+  description: "print number 2"
+  filters:
+  - regex: 
+    save:
+
+- name: "echo 3"
+  command: "echo 3"
+  description: "print number 3"
+  filters:
+  - regex: 
+    save:
+
+- name: "echo 4"
+  command: "echo 4"
+  description: "print number 4"
+  filters:
+  - regex: 
+    save:
+
+- name: "get root fs usage"
+  command: "df -h /"
+  description: "Shows file system details for root partition"
+  filters:
+  - regex: 
+    save:
+
+- name: "get docker fs usage"
+  command: "df -h /var/lib/docker"
+  description: "Shows file system details for docker partition"
+  filters:
+  - regex: 
+    save:
+
+- name: "get memory usage"
+  command: "free -m"
+  description: "Shows memory usage"
+  filters:
+  - regex: 
+    save:
+
+- name: "get pid count"
+  command: "ps aux | wc -l"
+  description: "Shows the count for running process ids"
+  filters:
+  - regex: 
+    save:
+
+- name: "get pid list"
+  command: "ps aux | wc -l"
+  description: "Shows the list of running process ids"
+  filters:
+  - regex: 
+    save:
+
+- name: "get docker containers"
+  command: "docker ps"
+  description: "Shows the list of running docker containers"
+  filters:
+  - regex: 
+    save:
+
+- name: "get all docker containers"
+  command: "docker ps -a"
+  description: "Shows the list of all docker containers(running, started, stoppped and dead)"
+  filters:
+  - regex: 
+    save:
+
+- name: "get docker containers count"
+  command: "docker ps | wc -l"
+  description: "Shows the count for running docker containers"
+  filters:
+  - regex: 
+    save:
+
+- name: "get hostname"
+  command: "hostname"
+  description: "Shows the node hostname"
+  filters:
+  - regex: 
+    save:
+
+- name: "get uptime"
+  command: 'uptime | cut -d\, -f1 | cut -d\  -f4,5'
+  description: "Shows the node uptime in days or hours:minutes"
+  filters:
+  - regex: 
+    save:
+
+- name: "list nodes"
+  command: 'h=`hostname`; u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`; k=`uname -r`; echo -e "$h\t$u\t$k"'
+  description: "Shows the hostname, uptime and kernel version"
+  filters:
+  - regex: 
+    save:
