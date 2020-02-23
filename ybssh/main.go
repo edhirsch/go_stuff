@@ -3,9 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"net"
 	"os"
 	"reflect"
 	"regexp"
@@ -13,12 +10,7 @@ import (
 	"strings"
 	"sync"
 	"text/tabwriter"
-	"time"
 	"unicode/utf8"
-
-	"gopkg.in/yaml.v2"
-
-	"golang.org/x/crypto/ssh"
 )
 
 // Constants
@@ -45,6 +37,15 @@ type Command struct {
 	Command     string   `yaml:"command"`
 	Description string   `yaml:"description"`
 	Filters     []Filter `yaml:",flow"`
+	Output      string
+	ReturnCode  int
+}
+
+// Execution pre-defined structure
+type Execution struct {
+	MultiSSH []SSH
+	Command
+	Scripts []Script
 }
 
 // Filter yaml struct
@@ -56,12 +57,10 @@ type Filter struct {
 // Script yaml pre-defined struct
 // ------------------------------------
 type Script struct {
-	ID         int    `yaml:"id"`
-	Command    string `yaml:"command"`
-	Loop       Loop   `yaml:",flow"`
-	Next       []Next `yaml:",flow"`
-	Output     Output
-	ReturnCode int
+	ID      int    `yaml:"id"`
+	Command string `yaml:"command"`
+	Loop    Loop   `yaml:",flow"`
+	Next    []Next `yaml:",flow"`
 }
 
 // Next yaml pre-defined struct
@@ -76,15 +75,11 @@ type Loop struct {
 	Break  string
 }
 
-// Output yaml struct
-type Output struct {
-	Stdout   string
-	Stderr   string
-	Variable struct {
-		Name  string
-		Value string
-	}
-}
+// // Output yaml struct
+// type Output struct {
+// 	Stdout string
+// 	Stderr string
+// }
 
 // Variable struct
 type Variable struct {
@@ -92,165 +87,21 @@ type Variable struct {
 	Value string
 }
 
-// SSH yaml pre-defined structures
-// ------------------------------------
-type SSH struct {
-	Server   string `yaml:"server"`
-	Port     string `yaml:"port"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	session  *ssh.Session
-	client   *ssh.Client
+// printTabbedTable function
+func printTabbedTable(lines []string) {
+	writer := tabwriter.NewWriter(os.Stdout, 20, 8, 1, '\t', tabwriter.AlignRight)
+	for i := 0; i < len(lines); i++ {
+		fmt.Fprintln(writer, lines[i])
+	}
+	writer.Flush()
 }
 
-// MultiSSH pre-defined structure
-type MultiSSH []SSH
-
-// ReadScriptYamlFile function
-func ReadScriptYamlFile(fileName string) ([]Script, error) {
-
-	var yamlConfig []Script
-	yamlFile, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		fmt.Printf("Error reading YAML file: %s\n", err)
-		return yamlConfig, err
+func getArgs() (string, string, string, error) {
+	args := os.Args[1:]
+	if len(args) < 2 {
+		return "", "", "", errors.New("error: insufficient arguments")
 	}
-
-	err = yaml.Unmarshal([]byte(yamlFile), &yamlConfig)
-	if err != nil {
-		fmt.Printf("Error parsing YAML file: %s\n", err)
-		return yamlConfig, err
-	}
-
-	if Debug {
-		fmt.Println(yamlConfig)
-	}
-
-	return yamlConfig, nil
-}
-
-// ReadCommandsYamlFile function
-func ReadCommandsYamlFile(fileName string) ([]Command, error) {
-
-	var yamlConfig []Command
-	yamlFile, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		fmt.Printf("Error reading YAML file: %s\n", err)
-		return yamlConfig, err
-	}
-
-	err = yaml.Unmarshal([]byte(yamlFile), &yamlConfig)
-	if err != nil {
-		fmt.Printf("Error parsing YAML file: %s\n", err)
-		return yamlConfig, err
-	}
-
-	if Debug {
-		fmt.Println(yamlConfig)
-	}
-
-	return yamlConfig, nil
-}
-
-// ReadHostsYamlFile function
-func ReadHostsYamlFile(fileName string) (MultiSSH, error) {
-
-	var yamlConfig MultiSSH
-	yamlFile, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		fmt.Printf("Error reading YAML file: %s\n", err)
-		return yamlConfig, err
-	}
-
-	err = yaml.Unmarshal([]byte(yamlFile), &yamlConfig)
-	if err != nil {
-		fmt.Printf("Error parsing YAML file: %s\n", err)
-		return yamlConfig, err
-	}
-
-	if Debug {
-		fmt.Println(yamlConfig)
-	}
-
-	return yamlConfig, nil
-}
-
-func (sshClient *SSH) readPublicKeyFile(file string) ssh.AuthMethod {
-	buffer, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil
-	}
-
-	key, err := ssh.ParsePrivateKey(buffer)
-	if err != nil {
-		return nil
-	}
-	return ssh.PublicKeys(key)
-}
-
-// Connect function
-func (sshClient *SSH) Connect(mode int) {
-
-	var sshConfig *ssh.ClientConfig
-	var auth []ssh.AuthMethod
-	if mode == CertPassword {
-		auth = []ssh.AuthMethod{ssh.Password(sshClient.Password)}
-	} else if mode == CertPublicKeyFile {
-		auth = []ssh.AuthMethod{sshClient.readPublicKeyFile(sshClient.Password)}
-	} else {
-		log.Println("does not support mode: ", mode)
-		return
-	}
-
-	sshConfig = &ssh.ClientConfig{
-		User: sshClient.User,
-		Auth: auth,
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			return nil
-		},
-		Timeout: time.Second * DefaultTimeout,
-	}
-
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%s", sshClient.Server, sshClient.Port), sshConfig)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	sshClient.client = client
-}
-
-// RunCmd function
-func (sshClient *SSH) RunCmd(cmd string) string {
-	var setVar Variable
-	var outStr string
-	out, err := sshClient.session.CombinedOutput(cmd)
-	if err != nil {
-		fmt.Println(err)
-	}
-	outStr = string(out)
-	setVar.Name = sshClient.Server + ":" + sshClient.Port + ".'" + cmd + "'.output"
-	setVar.Value = outStr
-	Variables = append(Variables, setVar)
-
-	return outStr
-}
-
-// RefreshSession function
-func (sshClient *SSH) RefreshSession() {
-	session, err := sshClient.client.NewSession()
-	if err != nil {
-		fmt.Println(err)
-		sshClient.Close()
-		return
-	}
-
-	sshClient.session = session
-}
-
-// Close function
-func (sshClient *SSH) Close() {
-	sshClient.session.Close()
-	sshClient.client.Close()
+	return args[0], args[1], strings.Join(args[2:], " "), nil
 }
 
 // PrintCommandOutput function
@@ -268,17 +119,48 @@ func (sshClient *SSH) PrintCommandOutput(output string, command string) {
 	}
 }
 
-// PrintTabbedTable function
-func PrintTabbedTable(lines []string) {
-	writer := tabwriter.NewWriter(os.Stdout, 20, 8, 1, '\t', tabwriter.AlignRight)
-	for i := 0; i < len(lines); i++ {
-		fmt.Fprintln(writer, lines[i])
+// RunCommandOnHosts function
+func (sshClients Execution) RunCommandOnHosts() {
+	var wg sync.WaitGroup
+	for i := 0; i < len(sshClients.MultiSSH); i++ {
+		sshClients.MultiSSH[i].Connect(CertPassword)
+		wg.Add(1)
+		go sshClients.MultiSSH[i].RunCmdParallel(sshClients.Command.Command, &wg)
 	}
-	writer.Flush()
+	wg.Wait()
+}
+
+// RunCmdParallel function
+func (sshClient SSH) RunCmdParallel(command string, wg *sync.WaitGroup) {
+	defer wg.Done()
+	var setVar Variable
+	sshClient.RefreshSession()
+	commandOutput := sshClient.RunCmd(command)
+	// setVar.Name = sshClient.Server + ":" + sshClient.Port + ".'" + command + "'.output"
+	// setVar.Value = commandOutput
+	Variables = append(Variables, setVar)
+
+	sshClient.PrintCommandOutput(commandOutput, command)
+	sshClient.Close()
+}
+
+// RunScriptOnHosts function
+func (sshClients Execution) RunScriptOnHosts() {
+	var wg sync.WaitGroup
+	for i := 0; i < len(sshClients.MultiSSH); i++ {
+		sshClients.MultiSSH[i].Connect(CertPassword)
+		wg.Add(1)
+		go sshClients.MultiSSH[i].findAndRunScript(sshClients.Scripts, &wg)
+	}
+	wg.Wait()
+
+	for i := 0; i < len(sshClients.MultiSSH); i++ {
+		sshClients.MultiSSH[i].Close()
+	}
 }
 
 // FindAndRunScript function
-func (sshClient *SSH) FindAndRunScript(scripts []Script, wg *sync.WaitGroup) {
+func (sshClient *SSH) findAndRunScript(scripts []Script, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var id []int
 	id = append(id, 1)
@@ -311,61 +193,18 @@ func (sshClient *SSH) FindAndRunScript(scripts []Script, wg *sync.WaitGroup) {
 	}
 }
 
-// RunScriptOnHosts function
-func (sshClients MultiSSH) RunScriptOnHosts(scripts []Script) {
-	var wg sync.WaitGroup
-	for i := 0; i < len(sshClients); i++ {
-		sshClients[i].Connect(CertPassword)
-		wg.Add(1)
-		go sshClients[i].FindAndRunScript(scripts, &wg)
-	}
-	wg.Wait()
-
-	for i := 0; i < len(sshClients); i++ {
-		sshClients[i].Close()
-	}
-}
-
-// RunCmdParallel function
-func (sshClient SSH) RunCmdParallel(command string, wg *sync.WaitGroup) {
-	defer wg.Done()
-	sshClient.RefreshSession()
-	cmdOutput := sshClient.RunCmd(command)
-	sshClient.PrintCommandOutput(cmdOutput, command)
-	sshClient.Close()
-}
-
-// RunCommandOnHosts function
-func (sshClients MultiSSH) RunCommandOnHosts(command string) {
-	var wg sync.WaitGroup
-	for i := 0; i < len(sshClients); i++ {
-		sshClients[i].Connect(CertPassword)
-		wg.Add(1)
-		go sshClients[i].RunCmdParallel(command, &wg)
-	}
-	wg.Wait()
-}
-
-func getArgs() (string, string, string, error) {
-	args := os.Args[1:]
-	if len(args) < 2 {
-		return "", "", "", errors.New("error: insufficient arguments")
-	}
-	return args[0], args[1], strings.Join(args[2:], " "), nil
-}
-
-func matchHost(hostString string, hostsList MultiSSH) (MultiSSH, error) {
-	var foundHosts MultiSSH
-	for i := 0; i < len(hostsList); i++ {
-		matched, err := regexp.MatchString(hostString, hostsList[i].Server)
+func matchHost(hostString string, hostsList Execution) (Execution, error) {
+	var foundHosts Execution
+	for i := 0; i < len(hostsList.MultiSSH); i++ {
+		matched, err := regexp.MatchString(hostString, hostsList.MultiSSH[i].Server)
 		if err == nil {
 			if matched {
-				foundHosts = append(foundHosts, hostsList[i])
+				foundHosts.MultiSSH = append(foundHosts.MultiSSH, hostsList.MultiSSH[i])
 			}
 		}
 	}
-	if len(foundHosts) == 0 {
-		return nil, errors.New("error: match failed")
+	if len(foundHosts.MultiSSH) == 0 {
+		return foundHosts, errors.New("error: match failed")
 	}
 	return foundHosts, nil
 }
@@ -419,7 +258,7 @@ func showHelp() {
 
 func main() {
 
-	var yamlHosts = "hosts.yaml"
+	var yamlHosts = "hosts_local.yaml"
 	var yamlCommands = "commands.yaml"
 	var fullCommand string
 	AuthType = CertPassword
@@ -449,16 +288,16 @@ func main() {
 
 	switch commandArg {
 	case "--exec":
-		execCommand := argsArg
-		matchedHosts.RunCommandOnHosts(execCommand)
+		matchedHosts.Command.Command = argsArg
+		matchedHosts.RunCommandOnHosts()
 	case "--apply":
 		yamlScript := argsArg
 		script, err := ReadScriptYamlFile(yamlScript)
 		if err != nil {
 			os.Exit(5)
 		}
-		fmt.Println(script)
-		matchedHosts.RunScriptOnHosts(script)
+		matchedHosts.Scripts = script
+		matchedHosts.RunScriptOnHosts()
 		for v := 0; v < len(Variables); v++ {
 			fmt.Printf("%v: %v", Variables[v].Name, Variables[v].Value)
 		}
@@ -468,7 +307,8 @@ func main() {
 		if err != nil {
 			os.Exit(6)
 		}
-		matchedHosts.RunCommandOnHosts(matchedCommand.Command)
+		matchedHosts.Command = matchedCommand
+		matchedHosts.RunCommandOnHosts()
 	default:
 		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
 		if err != nil {
@@ -486,10 +326,11 @@ func main() {
 				line := fmt.Sprintf("%v\t%v\t%v", partialCommands[i].Name, partialCommands[i].Command, partialCommands[i].Description)
 				lines = append(lines, line)
 			}
-			PrintTabbedTable(lines)
+			printTabbedTable(lines)
 			fmt.Println()
 			break
 		}
-		matchedHosts.RunCommandOnHosts(matchedCommand.Command)
+		matchedHosts.Command.Command = matchedCommand.Command
+		matchedHosts.RunCommandOnHosts()
 	}
 }
