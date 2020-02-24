@@ -66,12 +66,15 @@ func (sshClient *SSH) Connect(mode int) {
 }
 
 // RunCmd function
-func (sshClient *SSH) RunCmd(cmd string) string {
-	out, err := sshClient.session.CombinedOutput(cmd)
+func (sshClient *SSH) RunCmd(command string) string {
+	output, err := sshClient.session.CombinedOutput(command)
 	if err != nil {
 		fmt.Println(err)
 	}
-	return string(out)
+	if len(output) > 0 {
+		output = output[:len(output)-1]
+	}
+	return string(output)
 }
 
 // RefreshSession function

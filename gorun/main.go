@@ -101,6 +101,14 @@ func (sshClients Nodes) RunCommandOnHosts(command string) {
 	wg.Wait()
 }
 
+func (sshClients Nodes) getAllOutputs() []string {
+	var outputs []string
+	for i := 0; i < len(sshClients); i++ {
+		outputs = append(outputs, sshClients[i].Output)
+	}
+	return outputs
+}
+
 // RunCmdParallel function
 func (sshClient SSH) RunCmdParallel(command string, wg *sync.WaitGroup, c chan string) {
 	defer wg.Done()
@@ -122,7 +130,7 @@ func matchHost(hostString string, hostsList Nodes) (Nodes, error) {
 		}
 	}
 	if len(foundHosts) == 0 {
-		return foundHosts, errors.New("error: match failed")
+		return foundHosts, errors.New("error: host match failed")
 	}
 	return foundHosts, nil
 }
@@ -146,7 +154,7 @@ func matchCommand(commandString string, commandList []Command) (Command, []Comma
 	if foundCommand.Name != "" || len(matchedPartial) > 0 {
 		return foundCommand, matchedPartial, nil
 	}
-	return foundCommand, matchedPartial, errors.New("error: match failed")
+	return foundCommand, matchedPartial, errors.New("error: command match failed")
 }
 
 func matchArrayInArray(array1 []string, array2 []string) bool {
@@ -169,14 +177,19 @@ func showCommands(commands []Command) {
 	var lines []string
 	lines = append(lines, "LABELS\tCOMMAND\tDESCRIPTION")
 	for i := 0; i < len(commands); i++ {
-		line := fmt.Sprintf("%v\t%v\t%v", commands[i].Name, commands[i].Command, commands[i].Description)
+		line := fmt.Sprintf("%v\t%.35v\t%v", commands[i].Name, commands[i].Command, commands[i].Description)
 		lines = append(lines, line)
 	}
 	printTabbedTable(lines)
 }
 
+func printOutputWithDefaultBanner(output []string) {
+	var lines []string
+	lines = append(lines, output...)
+	printTabbedTable(lines)
+}
+
 func printOutputWithCustomBanner(banner string, output []string) {
-	Banner = false
 	var lines []string
 	banner = fmt.Sprintf(banner)
 	lines = append(lines, banner)
@@ -199,28 +212,32 @@ func main() {
 	var yamlHosts = "hosts_local.yaml"
 	var yamlCommands = "commands.yaml"
 	var fullCommand string
+	var outputs []string
 	AuthType = CertPassword
 
 	hosts, err := ReadHostsYamlFile(yamlHosts)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 
 	commands, err := ReadCommandsYamlFile(yamlCommands)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(2)
 	}
 
 	firstArg, secondArg, otherArg, err := getArgs()
 	if err != nil {
-		showHelp()
-		fmt.Println(err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(3)
+		showHelp()
 	}
 	fullCommand = secondArg + " " + otherArg
 
 	matchedHosts, err := matchHost(firstArg, hosts)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(4)
 	}
 
@@ -235,18 +252,16 @@ func main() {
 		showCommands(commands)
 		fmt.Println()
 		break
+
 	case "nodes":
 		Banner = false
-		var outputs []string
-
 		matchedCommand, _, err := matchCommand("list nodes", commands)
 		if err != nil {
-			os.Exit(6)
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(5)
 		}
 		matchedHosts.RunCommandOnHosts(matchedCommand.Command)
-		for i := 0; i < len(matchedHosts); i++ {
-			outputs = append(outputs, matchedHosts[i].Output)
-		}
+		outputs = matchedHosts.getAllOutputs()
 		printOutputWithCustomBanner(matchedCommand.Header, outputs)
 
 	default:
@@ -256,12 +271,17 @@ func main() {
 			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", yamlCommands)
 			fmt.Printf("For running one time commands, you can use :\n")
 			fmt.Printf("ybssh --exec '%v'\n\n", fullCommand)
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(6)
 		}
 		if len(partialCommands) > 0 {
 			fmt.Printf("Matched the following command labels :\n\n")
 			showCommands(partialCommands)
 			fmt.Println()
+			return
 		}
 		matchedHosts.RunCommandOnHosts(matchedCommand.Command)
+		outputs = matchedHosts.getAllOutputs()
+		printOutputWithDefaultBanner(outputs)
 	}
 }

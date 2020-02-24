@@ -33,22 +33,29 @@ func ReadCommandsYamlFile(fileName string) ([]Command, error) {
 // ReadHostsYamlFile function
 func ReadHostsYamlFile(fileName string) (Nodes, error) {
 
-	var yamlConfig Nodes
+	var yamlNodes []SSH
+	var node Node
+	var nodes Nodes
+
 	yamlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		fmt.Printf("Error reading YAML file: %s\n", err)
-		return yamlConfig, err
+		return nodes, err
 	}
 
-	err = yaml.Unmarshal([]byte(yamlFile), &yamlConfig)
+	err = yaml.Unmarshal([]byte(yamlFile), &yamlNodes)
 	if err != nil {
 		fmt.Printf("Error parsing YAML file: %s\n", err)
-		return yamlConfig, err
+		return nodes, err
+	}
+	for i := 0; i < len(yamlNodes); i++ {
+		node.Client = yamlNodes[i]
+		nodes = append(nodes, node)
 	}
 
 	if Debug {
-		fmt.Println(yamlConfig)
+		fmt.Println(nodes)
 	}
 
-	return yamlConfig, nil
+	return nodes, nil
 }

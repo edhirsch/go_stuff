@@ -108,7 +108,7 @@
 h=`hostname`;
 u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`;
 k=`uname -r | cut -d\- -f1`;
-cu=`sar | tail -2 | head -1 | awk "{print \\$4}"`''
+cu=`sar | tail -2 | head -1 | awk "{print \\$4}"`;
 mu=`sar -r | tail -2 | head -1 | awk "{print \\$5}"`;
 dfr=`df -h / --output=pcent | sed 1d`;
 dfd=`df -h /var/lib/docker --output=pcent | sed 1d`;
