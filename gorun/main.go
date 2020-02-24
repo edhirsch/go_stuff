@@ -33,12 +33,19 @@ type Command struct {
 	Name        string `yaml:"name"`
 	Command     string `yaml:"command"`
 	Description string `yaml:"description"`
+	Header      string `yaml:"header"`
 	Output      string
 	ReturnCode  int
 }
 
-// MultiSSH pre-defined struct
-type MultiSSH []SSH
+// Node pre-defined struct
+type Node struct {
+	Client SSH
+	Output string
+}
+
+// Nodes pre-defined struct
+type Nodes []Node
 
 // Filter yaml struct
 type Filter struct {
@@ -63,45 +70,51 @@ func getArgs() (string, string, string, error) {
 	return args[0], args[1], strings.Join(args[2:], " "), nil
 }
 
-// PrintCommandOutput function
-func (sshClient *SSH) PrintCommandOutput(output string, command string) {
-	if Banner == true {
-		x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+
-			utf8.RuneCountInString(command)+7)
-		fmt.Printf("%v\n", x)
-		fmt.Printf("| %v:%v; %v |\n", sshClient.Server, sshClient.Port, command)
-		fmt.Printf("%v\n", x)
-	}
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		fmt.Printf("%v\n", line)
-	}
+// addDefaultBanner function
+func (sshClient *SSH) addDefaultBanner(command string) string {
+	var banner string
+	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+
+		utf8.RuneCountInString(command)+7)
+	banner = banner + fmt.Sprintf("%v\n", x)
+	banner = banner + fmt.Sprintf("| %v:%v; %v |\n", sshClient.Server, sshClient.Port, command)
+	banner = banner + fmt.Sprintf("%v\n", x)
+
+	return banner
 }
 
 // RunCommandOnHosts function
-func (sshClients MultiSSH) RunCommandOnHosts(command string) {
+func (sshClients Nodes) RunCommandOnHosts(command string) {
 	var wg sync.WaitGroup
+
 	for i := 0; i < len(sshClients); i++ {
-		sshClients[i].Connect(CertPassword)
+		ch := make(chan string)
+		sshClients[i].Client.Connect(CertPassword)
 		wg.Add(1)
-		go sshClients[i].RunCmdParallel(command, &wg)
+		go sshClients[i].Client.RunCmdParallel(command, &wg, ch)
+		output := <-ch
+		if Banner == true {
+			banner := sshClients[i].Client.addDefaultBanner(command)
+			output = banner + output
+		}
+		sshClients[i].Output = output
 	}
 	wg.Wait()
 }
 
 // RunCmdParallel function
-func (sshClient SSH) RunCmdParallel(command string, wg *sync.WaitGroup) {
+func (sshClient SSH) RunCmdParallel(command string, wg *sync.WaitGroup, c chan string) {
 	defer wg.Done()
 	sshClient.RefreshSession()
 	commandOutput := sshClient.RunCmd(command)
-	sshClient.PrintCommandOutput(commandOutput, command)
+
+	c <- commandOutput
 	sshClient.Close()
 }
 
-func matchHost(hostString string, hostsList MultiSSH) (MultiSSH, error) {
-	var foundHosts MultiSSH
+func matchHost(hostString string, hostsList Nodes) (Nodes, error) {
+	var foundHosts Nodes
 	for i := 0; i < len(hostsList); i++ {
-		matched, err := regexp.MatchString(hostString, hostsList[i].Server)
+		matched, err := regexp.MatchString(hostString, hostsList[i].Client.Server)
 		if err == nil {
 			if matched {
 				foundHosts = append(foundHosts, hostsList[i])
@@ -162,6 +175,15 @@ func showCommands(commands []Command) {
 	printTabbedTable(lines)
 }
 
+func printOutputWithCustomBanner(banner string, output []string) {
+	Banner = false
+	var lines []string
+	banner = fmt.Sprintf(banner)
+	lines = append(lines, banner)
+	lines = append(lines, output...)
+	printTabbedTable(lines)
+}
+
 func showHelp() {
 	help := `Usage :
 	ybssh <hosts> <command labels>
@@ -205,17 +227,28 @@ func main() {
 	switch secondArg {
 	case "exec":
 		matchedHosts.RunCommandOnHosts(otherArg)
+		for i := 0; i < len(matchedHosts); i++ {
+			fmt.Println(matchedHosts[i].Output)
+		}
+
 	case "commands":
 		showCommands(commands)
 		fmt.Println()
 		break
 	case "nodes":
 		Banner = false
+		var outputs []string
+
 		matchedCommand, _, err := matchCommand("list nodes", commands)
 		if err != nil {
 			os.Exit(6)
 		}
 		matchedHosts.RunCommandOnHosts(matchedCommand.Command)
+		for i := 0; i < len(matchedHosts); i++ {
+			outputs = append(outputs, matchedHosts[i].Output)
+		}
+		printOutputWithCustomBanner(matchedCommand.Header, outputs)
+
 	default:
 		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
 		if err != nil {

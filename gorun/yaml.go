@@ -31,9 +31,9 @@ func ReadCommandsYamlFile(fileName string) ([]Command, error) {
 }
 
 // ReadHostsYamlFile function
-func ReadHostsYamlFile(fileName string) (MultiSSH, error) {
+func ReadHostsYamlFile(fileName string) (Nodes, error) {
 
-	var yamlConfig MultiSSH
+	var yamlConfig Nodes
 	yamlFile, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		fmt.Printf("Error reading YAML file: %s\n", err)

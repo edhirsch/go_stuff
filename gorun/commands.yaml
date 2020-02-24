@@ -104,8 +104,25 @@
     save:
 
 - name: "list nodes"
-  command: 'h=`hostname`; u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`; k=`uname -r`; echo -e "$h\t$u\t$k"'
+  command: '
+h=`hostname`;
+u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`;
+k=`uname -r | cut -d\- -f1`;
+cu=`sar | tail -2 | head -1 | awk "{print \\$4}"`''
+mu=`sar -r | tail -2 | head -1 | awk "{print \\$5}"`;
+dfr=`df -h / --output=pcent | sed 1d`;
+dfd=`df -h /var/lib/docker --output=pcent | sed 1d`;
+echo -e "$h\t$u\t$k\t$cu%\t$mu%\t$dfr\t$dfd"
+'
+  header: "HOSTNAME\tUPTIME\tKERNEL\tCPU USAGE\tMEMORY USAGE\tDISK USAGE ROOT\tDISK USAGE DOCKER"
   description: "Shows the hostname, uptime and kernel version"
+  filters:
+  - regex: 
+    save:
+
+- name: "install prerequisites"
+  command: 'systemctl status sysstat > /dev/null || bash -c "yum install -y sysstat && systemctl start sysstat ; systemctl enable sysstat"'
+  description: "Installs required packages and services"
   filters:
   - regex: 
     save:
