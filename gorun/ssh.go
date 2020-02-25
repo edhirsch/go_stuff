@@ -65,8 +65,8 @@ func (sshClient *SSH) Connect(mode int) {
 	sshClient.client = client
 }
 
-// RunCmd function
-func (sshClient *SSH) RunCmd(command string) string {
+// RunCommand function
+func (sshClient *SSH) RunCommand(command string) string {
 	output, err := sshClient.session.CombinedOutput(command)
 	if err != nil {
 		fmt.Println(err)

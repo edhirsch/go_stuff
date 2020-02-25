@@ -71,7 +71,7 @@ func getArgs() (string, string, string, error) {
 }
 
 // addDefaultBanner function
-func (sshClient *SSH) addDefaultBanner(command string) string {
+func addDefaultBanner(command string, sshClient SSH) string {
 	var banner string
 	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+
 		utf8.RuneCountInString(command)+7)
@@ -82,18 +82,18 @@ func (sshClient *SSH) addDefaultBanner(command string) string {
 	return banner
 }
 
-// RunCommandOnHosts function
-func (sshClients Nodes) RunCommandOnHosts(command string) {
+// runCommandOnHosts function
+func runCommandOnHosts(command string, sshClients Nodes) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < len(sshClients); i++ {
 		ch := make(chan string)
 		sshClients[i].Client.Connect(CertPassword)
 		wg.Add(1)
-		go sshClients[i].Client.RunCmdParallel(command, &wg, ch)
+		go RunCmdParallel(command, sshClients[i].Client, &wg, ch)
 		output := <-ch
 		if Banner == true {
-			banner := sshClients[i].Client.addDefaultBanner(command)
+			banner := addDefaultBanner(command, sshClients[i].Client)
 			output = banner + output
 		}
 		sshClients[i].Output = output
@@ -101,7 +101,7 @@ func (sshClients Nodes) RunCommandOnHosts(command string) {
 	wg.Wait()
 }
 
-func (sshClients Nodes) getAllOutputs() []string {
+func getAllOutputs(sshClients Nodes) []string {
 	var outputs []string
 	for i := 0; i < len(sshClients); i++ {
 		outputs = append(outputs, sshClients[i].Output)
@@ -110,10 +110,10 @@ func (sshClients Nodes) getAllOutputs() []string {
 }
 
 // RunCmdParallel function
-func (sshClient SSH) RunCmdParallel(command string, wg *sync.WaitGroup, c chan string) {
+func RunCmdParallel(command string, sshClient SSH, wg *sync.WaitGroup, c chan string) {
 	defer wg.Done()
 	sshClient.RefreshSession()
-	commandOutput := sshClient.RunCmd(command)
+	commandOutput := sshClient.RunCommand(command)
 
 	c <- commandOutput
 	sshClient.Close()
@@ -209,19 +209,19 @@ func showHelp() {
 
 func main() {
 
-	var yamlHosts = "hosts_local.yaml"
-	var yamlCommands = "commands.yaml"
+	var yamlHostsFile = "hosts_local.yaml"
+	var yamlCommandsFile = "commands.yaml"
 	var fullCommand string
 	var outputs []string
 	AuthType = CertPassword
 
-	hosts, err := ReadHostsYamlFile(yamlHosts)
+	hosts, err := ReadHostsYamlFile(yamlHostsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 
-	commands, err := ReadCommandsYamlFile(yamlCommands)
+	commands, err := ReadCommandsYamlFile(yamlCommandsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(2)
@@ -243,7 +243,7 @@ func main() {
 
 	switch secondArg {
 	case "exec":
-		matchedHosts.RunCommandOnHosts(otherArg)
+		runCommandOnHosts(otherArg, matchedHosts)
 		for i := 0; i < len(matchedHosts); i++ {
 			fmt.Println(matchedHosts[i].Output)
 		}
@@ -260,15 +260,15 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(5)
 		}
-		matchedHosts.RunCommandOnHosts(matchedCommand.Command)
-		outputs = matchedHosts.getAllOutputs()
+		runCommandOnHosts(matchedCommand.Command, matchedHosts)
+		outputs = getAllOutputs(matchedHosts)
 		printOutputWithCustomBanner(matchedCommand.Header, outputs)
 
 	default:
 		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
 		if err != nil {
 			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
-			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", yamlCommands)
+			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", yamlCommandsFile)
 			fmt.Printf("For running one time commands, you can use :\n")
 			fmt.Printf("ybssh --exec '%v'\n\n", fullCommand)
 			fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -280,8 +280,8 @@ func main() {
 			fmt.Println()
 			return
 		}
-		matchedHosts.RunCommandOnHosts(matchedCommand.Command)
-		outputs = matchedHosts.getAllOutputs()
+		runCommandOnHosts(matchedCommand.Command, matchedHosts)
+		outputs = getAllOutputs(matchedHosts)
 		printOutputWithDefaultBanner(outputs)
 	}
 }
