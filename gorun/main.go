@@ -24,9 +24,6 @@ const (
 	Debug             bool = false
 )
 
-// Banner ; true to show server name/command banner ; false to skip
-var Banner = true
-
 // AuthType ; CertPassword || CertPublicKeyFile
 var AuthType int
 
@@ -85,19 +82,19 @@ func getArgs() (string, string, string, error) {
 }
 
 // addDefaultBanner function
-func addDefaultBanner(command string, sshClient SSH) string {
+func addDefaultBanner(command string, duration string, sshClient SSH) string {
 	var banner string
 	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+
-		utf8.RuneCountInString(command)+7)
+		utf8.RuneCountInString(command)+utf8.RuneCountInString(duration)+9)
 	banner = banner + fmt.Sprintf("%v\n", x)
-	banner = banner + fmt.Sprintf("| %v:%v; %v |\n", sshClient.Server, sshClient.Port, command)
+	banner = banner + fmt.Sprintf("| %v:%v; %v; %v |\n", sshClient.Server, sshClient.Port, command, duration)
 	banner = banner + fmt.Sprintf("%v\n", x)
 
 	return banner
 }
 
 // runCommandOnHosts function
-func runCommandOnHosts(command string, sshClients Nodes) {
+func runCommandOnHosts(command Command, sshClients Nodes) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < len(sshClients); i++ {
@@ -105,22 +102,27 @@ func runCommandOnHosts(command string, sshClients Nodes) {
 		var output string
 		t1 := time.Now()
 		wg.Add(1)
-		go RunCommandParallel(command, sshClients[i].Client, &wg, c)
+		go RunCommandParallel(command.Command, sshClients[i].Client, &wg, c)
 		go func(sshClient *Node) {
 			output = <-c
 			t2 := time.Now()
 			tdiff := t2.Sub(t1)
-			if Banner == true {
-				banner := addDefaultBanner(command, sshClient.Client)
+			duration := fmt.Sprintf("%0.2vs", tdiff.Seconds())
+			if command.Header == "" {
+				banner := addDefaultBanner(command.Command, duration, sshClient.Client)
 				sshClient.Output = banner + output
+				fmt.Println(sshClient.Output)
 			} else {
 				sshClient.Output = output
 			}
-			sshClient.Output += fmt.Sprintf("\t%v", tdiff)
 
 		}(&sshClients[i])
 	}
 	wg.Wait()
+	if command.Header != "" {
+		outputs := getAllOutputs(sshClients)
+		printOutputWithCustomBanner(command.Header, outputs)
+	}
 }
 
 func getAllOutputs(sshClients Nodes) []string {
@@ -206,12 +208,6 @@ func showCommands(commands []Command) {
 	printTabbedTable(lines)
 }
 
-func printOutputWithDefaultBanner(output []string) {
-	var lines []string
-	lines = append(lines, output...)
-	printTabbedTable(lines)
-}
-
 func printOutputWithCustomBanner(banner string, output []string) {
 	var lines []string
 	banner = fmt.Sprintf(banner)
@@ -232,10 +228,9 @@ func showHelp() {
 
 func main() {
 
-	var yamlHostsFile = "hosts_prod.yaml"
+	var yamlHostsFile = "hosts_local.yaml"
 	var yamlCommandsFile = "commands.yaml"
 	var fullCommand string
-	var outputs []string
 	AuthType = CertPassword
 
 	hosts, err := ReadHostsYamlFile(yamlHostsFile)
@@ -269,7 +264,9 @@ func main() {
 
 	switch secondArg {
 	case "exec":
-		runCommandOnHosts(otherArg, matchedHosts)
+		var execCommand Command
+		execCommand.Command = otherArg
+		runCommandOnHosts(execCommand, matchedHosts)
 		for i := 0; i < len(matchedHosts); i++ {
 			fmt.Println(matchedHosts[i].Output)
 		}
@@ -278,17 +275,6 @@ func main() {
 		showCommands(commands)
 		fmt.Println()
 		break
-
-	case "nodes":
-		Banner = false
-		matchedCommand, _, err := matchCommand("list nodes", commands)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(5)
-		}
-		runCommandOnHosts(matchedCommand.Command, matchedHosts)
-		outputs = getAllOutputs(matchedHosts)
-		printOutputWithCustomBanner(matchedCommand.Header, outputs)
 
 	default:
 		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
@@ -306,8 +292,6 @@ func main() {
 			fmt.Println()
 			return
 		}
-		runCommandOnHosts(matchedCommand.Command, matchedHosts)
-		outputs = getAllOutputs(matchedHosts)
-		printOutputWithDefaultBanner(outputs)
+		runCommandOnHosts(matchedCommand, matchedHosts)
 	}
 }

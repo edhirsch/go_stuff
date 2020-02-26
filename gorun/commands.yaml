@@ -103,7 +103,7 @@
   - regex: 
     save:
 
-- name: "list nodes"
+- name: "get status"
   command: '
 h=`hostname`;
 u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`;
