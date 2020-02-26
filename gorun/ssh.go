@@ -10,16 +10,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// SSH yaml pre-defined structures
-// ------------------------------------
-type SSH struct {
-	Server   string `yaml:"server"`
-	Port     string `yaml:"port"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	session  *ssh.Session
-	client   *ssh.Client
-}
+// Defaults
+const (
+	DefaultPort     string = "22"
+	DefaultUser     string = "root"
+	DefaultPassword string = "Ci5c0k|cK!"
+)
 
 func (sshClient *SSH) readPublicKeyFile(file string) ssh.AuthMethod {
 	buffer, err := ioutil.ReadFile(file)
@@ -32,6 +28,18 @@ func (sshClient *SSH) readPublicKeyFile(file string) ssh.AuthMethod {
 		return nil
 	}
 	return ssh.PublicKeys(key)
+}
+
+func (sshClient *SSH) init() {
+	if sshClient.User == "" {
+		sshClient.User = DefaultUser
+	}
+	if sshClient.Port == "" {
+		sshClient.Port = DefaultPort
+	}
+	if sshClient.Password == "" {
+		sshClient.Password = DefaultPassword
+	}
 }
 
 // Connect function

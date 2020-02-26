@@ -10,7 +10,10 @@ import (
 	"strings"
 	"sync"
 	"text/tabwriter"
+	"time"
 	"unicode/utf8"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // Constants
@@ -26,6 +29,17 @@ var Banner = true
 
 // AuthType ; CertPassword || CertPublicKeyFile
 var AuthType int
+
+// SSH yaml pre-defined structures
+// ------------------------------------
+type SSH struct {
+	Server   string `yaml:"server"`
+	Port     string `default:"22" yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	session  *ssh.Session
+	client   *ssh.Client
+}
 
 // Command pre-defined struct
 // ------------------------------------
@@ -87,16 +101,24 @@ func runCommandOnHosts(command string, sshClients Nodes) {
 	var wg sync.WaitGroup
 
 	for i := 0; i < len(sshClients); i++ {
-		ch := make(chan string)
-		sshClients[i].Client.Connect(CertPassword)
+		c := make(chan string)
+		var output string
+		t1 := time.Now()
 		wg.Add(1)
-		go RunCmdParallel(command, sshClients[i].Client, &wg, ch)
-		output := <-ch
-		if Banner == true {
-			banner := addDefaultBanner(command, sshClients[i].Client)
-			output = banner + output
-		}
-		sshClients[i].Output = output
+		go RunCommandParallel(command, sshClients[i].Client, &wg, c)
+		go func(sshClient *Node) {
+			output = <-c
+			t2 := time.Now()
+			tdiff := t2.Sub(t1)
+			if Banner == true {
+				banner := addDefaultBanner(command, sshClient.Client)
+				sshClient.Output = banner + output
+			} else {
+				sshClient.Output = output
+			}
+			sshClient.Output += fmt.Sprintf("\t%v", tdiff)
+
+		}(&sshClients[i])
 	}
 	wg.Wait()
 }
@@ -109,9 +131,10 @@ func getAllOutputs(sshClients Nodes) []string {
 	return outputs
 }
 
-// RunCmdParallel function
-func RunCmdParallel(command string, sshClient SSH, wg *sync.WaitGroup, c chan string) {
+// RunCommandParallel function
+func RunCommandParallel(command string, sshClient SSH, wg *sync.WaitGroup, c chan string) {
 	defer wg.Done()
+	sshClient.Connect(CertPassword)
 	sshClient.RefreshSession()
 	commandOutput := sshClient.RunCommand(command)
 
@@ -209,7 +232,7 @@ func showHelp() {
 
 func main() {
 
-	var yamlHostsFile = "hosts_local.yaml"
+	var yamlHostsFile = "hosts_prod.yaml"
 	var yamlCommandsFile = "commands.yaml"
 	var fullCommand string
 	var outputs []string
@@ -219,6 +242,9 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
+	}
+	for i := 0; i < len(hosts); i++ {
+		hosts[i].Client.init()
 	}
 
 	commands, err := ReadCommandsYamlFile(yamlCommandsFile)
