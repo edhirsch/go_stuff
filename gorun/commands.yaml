@@ -104,8 +104,7 @@
     save:
 
 - name: "get status"
-  command: '
-h=`hostname`;
+  command: 'h=`hostname`;
 u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`;
 k=`uname -r | cut -d\- -f1`;
 cu=`sar 2> /dev/null | tail -2 | head -1 | awk "{print \\$4}"`; if [[ $cu == "" ]]; then cu="N/A"; fi;

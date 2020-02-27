@@ -31,7 +31,7 @@ var AuthType int
 // ------------------------------------
 type SSH struct {
 	Server   string `yaml:"server"`
-	Port     string `default:"22" yaml:"port"`
+	Port     string `yaml:"port"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 	session  *ssh.Session
@@ -64,7 +64,6 @@ type Filter struct {
 	Save  string
 }
 
-// printTabbedTable function
 func printTabbedTable(lines []string) {
 	writer := tabwriter.NewWriter(os.Stdout, 20, 8, 1, '\t', tabwriter.AlignRight)
 	for i := 0; i < len(lines); i++ {
@@ -81,7 +80,6 @@ func getArgs() (string, string, string, error) {
 	return args[0], args[1], strings.Join(args[2:], " "), nil
 }
 
-// addDefaultBanner function
 func addDefaultBanner(command string, duration string, sshClient SSH) string {
 	var banner string
 	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+
@@ -93,7 +91,6 @@ func addDefaultBanner(command string, duration string, sshClient SSH) string {
 	return banner
 }
 
-// runCommandOnHosts function
 func runCommandOnHosts(command Command, sshClients Nodes) {
 	var wg sync.WaitGroup
 
@@ -102,7 +99,7 @@ func runCommandOnHosts(command Command, sshClients Nodes) {
 		var output string
 		t1 := time.Now()
 		wg.Add(1)
-		go RunCommandParallel(command.Command, sshClients[i].Client, &wg, c)
+		go runCommandParallel(command.Command, sshClients[i].Client, &wg, c)
 		go func(sshClient *Node) {
 			output = <-c
 			t2 := time.Now()
@@ -111,7 +108,7 @@ func runCommandOnHosts(command Command, sshClients Nodes) {
 			if command.Header == "" {
 				banner := addDefaultBanner(command.Command, duration, sshClient.Client)
 				sshClient.Output = banner + output
-				fmt.Println(sshClient.Output)
+				fmt.Printf("%v\n\n", sshClient.Output)
 			} else {
 				sshClient.Output = output
 			}
@@ -133,12 +130,15 @@ func getAllOutputs(sshClients Nodes) []string {
 	return outputs
 }
 
-// RunCommandParallel function
-func RunCommandParallel(command string, sshClient SSH, wg *sync.WaitGroup, c chan string) {
+func runCommandParallel(command string, sshClient SSH, wg *sync.WaitGroup, c chan string) {
 	defer wg.Done()
-	sshClient.Connect(CertPassword)
+	err := sshClient.Connect(CertPassword)
+	if err != nil {
+		c <- fmt.Sprintln(err)
+		return
+	}
 	sshClient.RefreshSession()
-	commandOutput := sshClient.RunCommand(command)
+	commandOutput, err := sshClient.RunCommand(command)
 
 	c <- commandOutput
 	sshClient.Close()
@@ -155,7 +155,7 @@ func matchHost(hostString string, hostsList Nodes) (Nodes, error) {
 		}
 	}
 	if len(foundHosts) == 0 {
-		return foundHosts, errors.New("error: host match failed")
+		return foundHosts, fmt.Errorf("error: couldn't match any hosts using the provided pattern '%v'", hostString)
 	}
 	return foundHosts, nil
 }
@@ -179,7 +179,7 @@ func matchCommand(commandString string, commandList []Command) (Command, []Comma
 	if foundCommand.Name != "" || len(matchedPartial) > 0 {
 		return foundCommand, matchedPartial, nil
 	}
-	return foundCommand, matchedPartial, errors.New("error: command match failed")
+	return foundCommand, matchedPartial, fmt.Errorf("error: couldn't match any commands using the provided labels '%v'", commandString)
 }
 
 func matchArrayInArray(array1 []string, array2 []string) bool {
@@ -236,7 +236,7 @@ func main() {
 	hosts, err := ReadHostsYamlFile(yamlHostsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		return
 	}
 	for i := 0; i < len(hosts); i++ {
 		hosts[i].Client.init()
@@ -245,21 +245,21 @@ func main() {
 	commands, err := ReadCommandsYamlFile(yamlCommandsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(2)
+		return
 	}
 
 	firstArg, secondArg, otherArg, err := getArgs()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(3)
 		showHelp()
+		return
 	}
 	fullCommand = secondArg + " " + otherArg
 
 	matchedHosts, err := matchHost(firstArg, hosts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(4)
+		return
 	}
 
 	switch secondArg {
@@ -267,9 +267,6 @@ func main() {
 		var execCommand Command
 		execCommand.Command = otherArg
 		runCommandOnHosts(execCommand, matchedHosts)
-		for i := 0; i < len(matchedHosts); i++ {
-			fmt.Println(matchedHosts[i].Output)
-		}
 
 	case "commands":
 		showCommands(commands)
@@ -284,7 +281,7 @@ func main() {
 			fmt.Printf("For running one time commands, you can use :\n")
 			fmt.Printf("ybssh --exec '%v'\n\n", fullCommand)
 			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(6)
+			return
 		}
 		if len(partialCommands) > 0 {
 			fmt.Printf("Matched the following command labels :\n\n")

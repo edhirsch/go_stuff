@@ -1,9 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"time"
 
@@ -16,6 +16,18 @@ const (
 	DefaultUser     string = "root"
 	DefaultPassword string = "Ci5c0k|cK!"
 )
+
+func (sshClient *SSH) init() {
+	if sshClient.User == "" {
+		sshClient.User = DefaultUser
+	}
+	if sshClient.Port == "" {
+		sshClient.Port = DefaultPort
+	}
+	if sshClient.Password == "" {
+		sshClient.Password = DefaultPassword
+	}
+}
 
 func (sshClient *SSH) readPublicKeyFile(file string) ssh.AuthMethod {
 	buffer, err := ioutil.ReadFile(file)
@@ -30,20 +42,8 @@ func (sshClient *SSH) readPublicKeyFile(file string) ssh.AuthMethod {
 	return ssh.PublicKeys(key)
 }
 
-func (sshClient *SSH) init() {
-	if sshClient.User == "" {
-		sshClient.User = DefaultUser
-	}
-	if sshClient.Port == "" {
-		sshClient.Port = DefaultPort
-	}
-	if sshClient.Password == "" {
-		sshClient.Password = DefaultPassword
-	}
-}
-
 // Connect function
-func (sshClient *SSH) Connect(mode int) {
+func (sshClient *SSH) Connect(mode int) error {
 
 	var sshConfig *ssh.ClientConfig
 	var auth []ssh.AuthMethod
@@ -52,8 +52,8 @@ func (sshClient *SSH) Connect(mode int) {
 	} else if mode == CertPublicKeyFile {
 		auth = []ssh.AuthMethod{sshClient.readPublicKeyFile(sshClient.Password)}
 	} else {
-		log.Println("does not support mode: ", mode)
-		return
+		err := errors.New(fmt.Sprintln("error: does not support mode: ", mode))
+		return err
 	}
 
 	sshConfig = &ssh.ClientConfig{
@@ -67,22 +67,22 @@ func (sshClient *SSH) Connect(mode int) {
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%s", sshClient.Server, sshClient.Port), sshConfig)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 	sshClient.client = client
+	return nil
 }
 
 // RunCommand function
-func (sshClient *SSH) RunCommand(command string) string {
+func (sshClient *SSH) RunCommand(command string) (string, error) {
 	output, err := sshClient.session.CombinedOutput(command)
-	if err != nil {
-		fmt.Println(err)
-	}
 	if len(output) > 0 {
 		output = output[:len(output)-1]
 	}
-	return string(output)
+	if err != nil {
+		return string(output), err
+	}
+	return string(output), nil
 }
 
 // RefreshSession function
