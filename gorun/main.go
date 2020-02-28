@@ -12,8 +12,6 @@ import (
 	"text/tabwriter"
 	"time"
 	"unicode/utf8"
-
-	"golang.org/x/crypto/ssh"
 )
 
 // Constants
@@ -26,17 +24,6 @@ const (
 
 // AuthType ; CertPassword || CertPublicKeyFile
 var AuthType int
-
-// SSH yaml pre-defined structures
-// ------------------------------------
-type SSH struct {
-	Server   string `yaml:"server"`
-	Port     string `yaml:"port"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	session  *ssh.Session
-	client   *ssh.Client
-}
 
 // Command pre-defined struct
 // ------------------------------------
@@ -51,8 +38,9 @@ type Command struct {
 
 // Node pre-defined struct
 type Node struct {
-	Client SSH
-	Output string
+	Client     SSH
+	Output     string
+	ReturnCode int
 }
 
 // Nodes pre-defined struct
@@ -80,12 +68,33 @@ func getArgs() (string, string, string, error) {
 	return args[0], args[1], strings.Join(args[2:], " "), nil
 }
 
-func addDefaultBanner(command string, duration string, sshClient SSH) string {
+func getDefaultBanner(command string, duration string, rc string, sshClient SSH) string {
 	var banner string
-	x := strings.Repeat("-", utf8.RuneCountInString(sshClient.Server)+utf8.RuneCountInString(sshClient.Port)+
-		utf8.RuneCountInString(command)+utf8.RuneCountInString(duration)+9)
+	x := strings.Repeat("-",
+		utf8.RuneCountInString(sshClient.Server)+
+			utf8.RuneCountInString(sshClient.Port)+
+			utf8.RuneCountInString(command)+utf8.RuneCountInString(duration)+
+			utf8.RuneCountInString(rc)+
+			37)
 	banner = banner + fmt.Sprintf("%v\n", x)
-	banner = banner + fmt.Sprintf("| %v:%v; %v; %v |\n", sshClient.Server, sshClient.Port, command, duration)
+	banner = banner + fmt.Sprintf("| %v:%v | command: %v | duration: %v | rc: %v |\n", sshClient.Server, sshClient.Port, command, duration, rc)
+	banner = banner + fmt.Sprintf("%v\n", x)
+
+	return banner
+}
+
+func getSummaryBanner(command string, duration string, passed string, failed string, total string) string {
+	var banner string
+	x := strings.Repeat("-",
+		utf8.RuneCountInString(command)+
+			utf8.RuneCountInString(duration)+
+			utf8.RuneCountInString(passed)+
+			utf8.RuneCountInString(failed)+
+			utf8.RuneCountInString(total)+
+			68)
+	banner = banner + fmt.Sprintf("%v\n", x)
+	banner = banner + fmt.Sprintf("| summary | command: %v | duration: %v | passed: %v | failed: %v | total: %v |\n",
+		command, duration, passed, failed, total)
 	banner = banner + fmt.Sprintf("%v\n", x)
 
 	return banner
@@ -93,32 +102,43 @@ func addDefaultBanner(command string, duration string, sshClient SSH) string {
 
 func runCommandOnHosts(command Command, sshClients Nodes) {
 	var wg sync.WaitGroup
-
+	tt1 := time.Now()
 	for i := 0; i < len(sshClients); i++ {
 		c := make(chan string)
-		var output string
+		e := make(chan error)
 		t1 := time.Now()
 		wg.Add(1)
-		go runCommandParallel(command.Command, sshClients[i].Client, &wg, c)
+		go runCommandParallel(command.Command, sshClients[i].Client, &wg, c, e)
 		go func(sshClient *Node) {
-			output = <-c
-			t2 := time.Now()
-			tdiff := t2.Sub(t1)
+			output := <-c
+			err := <-e
+			if err != nil {
+				sshClient.ReturnCode = 1
+			}
+			tdiff := time.Now().Sub(t1)
 			duration := fmt.Sprintf("%0.2vs", tdiff.Seconds())
+			rc := fmt.Sprintf("%v", sshClient.ReturnCode)
 			if command.Header == "" {
-				banner := addDefaultBanner(command.Command, duration, sshClient.Client)
-				sshClient.Output = banner + output
+				banner := getDefaultBanner(command.Command, duration, rc, sshClient.Client)
+				if sshClient.ReturnCode == 0 {
+					sshClient.Output = Green(banner) + Default(output)
+				} else {
+					sshClient.Output = Red(banner) + Black(output)
+				}
 				fmt.Printf("%v\n\n", sshClient.Output)
 			} else {
 				sshClient.Output = output
 			}
-
 		}(&sshClients[i])
 	}
 	wg.Wait()
+	tdiff := time.Now().Sub(tt1)
+	totalDuration := fmt.Sprintf("%0.2vs", tdiff.Seconds())
 	if command.Header != "" {
 		outputs := getAllOutputs(sshClients)
 		printOutputWithCustomBanner(command.Header, outputs)
+	} else {
+		printCommandSummary(sshClients, command.Name, totalDuration)
 	}
 }
 
@@ -130,7 +150,37 @@ func getAllOutputs(sshClients Nodes) []string {
 	return outputs
 }
 
-func runCommandParallel(command string, sshClient SSH, wg *sync.WaitGroup, c chan string) {
+func printCommandSummary(sshClients Nodes, command string, duration string) {
+	var passed, failed int
+	var summary []string
+
+	for i := 0; i < len(sshClients); i++ {
+		serverAndPort := fmt.Sprintf("%v:%v", sshClients[i].Client.Server, sshClients[i].Client.Port)
+		if sshClients[i].ReturnCode > 0 {
+			failed++
+			summary = append(summary, fmt.Sprintf("%v -> %v", serverAndPort, Red("FAILED")))
+		} else {
+			passed++
+			summary = append(summary, fmt.Sprintf("%v -> %v", serverAndPort, Green("PASSED")))
+		}
+	}
+	total := len(sshClients)
+	banner := getSummaryBanner(command, duration, fmt.Sprintf("%v", passed), fmt.Sprintf("%v", failed), fmt.Sprintf("%v", total))
+
+	if total == passed {
+		fmt.Printf("%v", Green(banner))
+	} else if total == failed {
+		fmt.Printf("%v", Red(banner))
+	} else {
+		fmt.Printf("%v", Yellow(banner))
+	}
+
+	for i := 0; i < len(summary); i++ {
+		fmt.Printf("%v\n", summary[i])
+	}
+}
+
+func runCommandParallel(command string, sshClient SSH, wg *sync.WaitGroup, c chan string, e chan error) {
 	defer wg.Done()
 	err := sshClient.Connect(CertPassword)
 	if err != nil {
@@ -141,6 +191,7 @@ func runCommandParallel(command string, sshClient SSH, wg *sync.WaitGroup, c cha
 	commandOutput, err := sshClient.RunCommand(command)
 
 	c <- commandOutput
+	e <- err
 	sshClient.Close()
 }
 
@@ -218,10 +269,10 @@ func printOutputWithCustomBanner(banner string, output []string) {
 
 func showHelp() {
 	help := `Usage :
-	ybssh <hosts> <command labels>
-	ybssh <hosts> commands
-	ybssh <hosts> nodes
-	ybssh <hosts> exec <command>
+	gorun <hosts> <command labels>
+	gorun <hosts> commands
+	gorun <hosts> exec <command>
+	gorun <hosts> play <script>
 	`
 	fmt.Println(help)
 }
@@ -266,6 +317,7 @@ func main() {
 	case "exec":
 		var execCommand Command
 		execCommand.Command = otherArg
+		execCommand.Name = otherArg
 		runCommandOnHosts(execCommand, matchedHosts)
 
 	case "commands":
@@ -279,7 +331,7 @@ func main() {
 			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
 			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", yamlCommandsFile)
 			fmt.Printf("For running one time commands, you can use :\n")
-			fmt.Printf("ybssh --exec '%v'\n\n", fullCommand)
+			fmt.Printf("gorun --exec '%v'\n\n", fullCommand)
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			return
 		}

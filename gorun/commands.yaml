@@ -125,3 +125,10 @@ echo -e "$h\t$u\t$k\t$cu\t$mu\t$dfr\t$dfd"
   filters:
   - regex: 
     save:
+
+- name: "get random return code"
+  command: 'exit $((RANDOM % 2))'
+  description: "Run a command with a random return code of 0 or 1"
+  filters:
+    - regex: 
+      save:

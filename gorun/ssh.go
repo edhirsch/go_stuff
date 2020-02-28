@@ -17,6 +17,17 @@ const (
 	DefaultPassword string = "Ci5c0k|cK!"
 )
 
+// SSH yaml pre-defined structures
+// ------------------------------------
+type SSH struct {
+	Server   string `yaml:"server"`
+	Port     string `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	session  *ssh.Session
+	client   *ssh.Client
+}
+
 func (sshClient *SSH) init() {
 	if sshClient.User == "" {
 		sshClient.User = DefaultUser
