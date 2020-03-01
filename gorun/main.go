@@ -30,6 +30,7 @@ var AuthType int
 type Command struct {
 	Name        string `yaml:"name"`
 	Command     string `yaml:"command"`
+	Args        string `yaml:"args"`
 	Description string `yaml:"description"`
 	Header      string `yaml:"header"`
 	Output      string
@@ -60,12 +61,24 @@ func printTabbedTable(lines []string) {
 	writer.Flush()
 }
 
-func getArgs() (string, string, string, error) {
+func getArgs() (string, string, string, string, error) {
+	var hostPattern, commandLabel, otherCommandLabels, commandExtraArgs string
 	args := os.Args[1:]
 	if len(args) < 2 {
-		return "", "", "", errors.New("error: insufficient arguments")
+		return "", "", "", "", errors.New("error: insufficient arguments")
 	}
-	return args[0], args[1], strings.Join(args[2:], " "), nil
+	hostPattern = args[0]
+	commandLabel = args[1]
+	argsString := strings.Join(args[2:], " ")
+	argsSplit := regexp.MustCompile("--").Split(argsString, -1)
+	if len(argsSplit) == 0 {
+		otherCommandLabels = argsString
+	} else {
+		otherCommandLabels = argsSplit[0]
+		commandExtraArgs = argsSplit[len(argsSplit)-1]
+	}
+
+	return hostPattern, commandLabel, otherCommandLabels, commandExtraArgs, nil
 }
 
 func getDefaultBanner(command string, duration string, rc string, sshClient SSH) string {
@@ -109,7 +122,8 @@ func runCommandOnHosts(command Command, sshClients Nodes) {
 		e := make(chan error)
 		t1 := time.Now()
 		wg.Add(1)
-		go runCommandParallel(command.Command, sshClients[i].Client, &wg, c, e)
+		runCommand := command.Command + " " + command.Args
+		go runCommandParallel(runCommand, sshClients[i].Client, &wg, c, e)
 		go func(sshClient *Node) {
 			output := <-c
 			err := <-e
@@ -120,7 +134,7 @@ func runCommandOnHosts(command Command, sshClients Nodes) {
 			duration := fmt.Sprintf("%0.2vs", tdiff.Seconds())
 			rc := fmt.Sprintf("%v", sshClient.ReturnCode)
 			if command.Header == "" {
-				banner := getDefaultBanner(command.Command, duration, rc, sshClient.Client)
+				banner := getDefaultBanner(runCommand, duration, rc, sshClient.Client)
 				if sshClient.ReturnCode == 0 {
 					sshClient.Output = Green(banner) + Default(output)
 				} else {
@@ -215,15 +229,15 @@ func matchHost(hostString string, hostsList Nodes) (Nodes, error) {
 func matchCommand(commandString string, commandList []Command) (Command, []Command, error) {
 	var foundCommand Command
 	var matchedPartial []Command
-	commandLabels := strings.Fields(commandString)
-	sort.Strings(commandLabels)
+	primaryCommandLabels := strings.Fields(commandString)
+	sort.Strings(primaryCommandLabels)
 	for i := 0; i < len(commandList); i++ {
 		commandListLabels := strings.Fields(commandList[i].Name)
 		sort.Strings(commandListLabels)
-		if reflect.DeepEqual(commandListLabels, commandLabels) == true {
+		if reflect.DeepEqual(commandListLabels, primaryCommandLabels) == true {
 			foundCommand = commandList[i]
 		} else {
-			if matchArrayInArray(commandLabels, commandListLabels) == true {
+			if matchArrayInArray(primaryCommandLabels, commandListLabels) == true {
 				matchedPartial = append(matchedPartial, commandList[i])
 			}
 		}
@@ -300,25 +314,26 @@ func main() {
 		return
 	}
 
-	firstArg, secondArg, otherArg, err := getArgs()
+	hostsPattern, primaryCommandLabel, otherCommandLabels, commandArgs, err := getArgs()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		showHelp()
 		return
 	}
-	fullCommand = secondArg + " " + otherArg
+	fullCommand = primaryCommandLabel + " " + otherCommandLabels
 
-	matchedHosts, err := matchHost(firstArg, hosts)
+	matchedHosts, err := matchHost(hostsPattern, hosts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
 
-	switch secondArg {
+	switch primaryCommandLabel {
 	case "exec":
 		var execCommand Command
-		execCommand.Command = otherArg
-		execCommand.Name = otherArg
+		execCommand.Command = otherCommandLabels
+		execCommand.Args = commandArgs
+		execCommand.Name = otherCommandLabels
 		runCommandOnHosts(execCommand, matchedHosts)
 
 	case "commands":
@@ -342,6 +357,7 @@ func main() {
 			fmt.Println()
 			return
 		}
+		matchedCommand.Args = commandArgs
 		runCommandOnHosts(matchedCommand, matchedHosts)
 	}
 }
