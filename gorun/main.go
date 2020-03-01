@@ -77,7 +77,8 @@ func getDefaultBanner(command string, duration string, rc string, sshClient SSH)
 			utf8.RuneCountInString(rc)+
 			37)
 	banner = banner + fmt.Sprintf("%v\n", x)
-	banner = banner + fmt.Sprintf("| %v:%v | command: %v | duration: %v | rc: %v |\n", sshClient.Server, sshClient.Port, command, duration, rc)
+	banner = banner + fmt.Sprintf("| %v:%v | command: %v | duration: %v | rc: %v |\n",
+		sshClient.Server, sshClient.Port, command, duration, rc)
 	banner = banner + fmt.Sprintf("%v\n", x)
 
 	return banner
@@ -280,7 +281,7 @@ func showHelp() {
 func main() {
 
 	var yamlHostsFile = "hosts_local.yaml"
-	var yamlCommandsFile = "commands.yaml"
+	var yamlCommandsFile = "commands"
 	var fullCommand string
 	AuthType = CertPassword
 
@@ -293,7 +294,7 @@ func main() {
 		hosts[i].Client.init()
 	}
 
-	commands, err := ReadCommandsYamlFile(yamlCommandsFile)
+	commands, err := readCommandsYamlFile(yamlCommandsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return

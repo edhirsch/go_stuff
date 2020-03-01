@@ -1,134 +1,82 @@
-- name: "echo 0"
-  command: "echo 0"
-  description: "print number 0"
-  filters:
-  - regex: 
-    save:
+commands:
+  - name: "echo 0"
+    command: "echo 0"
+    description: "print number 0"
 
-- name: "echo 1"
-  command: "echo 1"
-  description: "print number 1"
-  filters:
-  - regex: 
-    save:
+  - name: "echo 1"
+    command: "echo 1"
+    description: "print number 1"
 
-- name: "echo 2"
-  command: "echo 2"
-  description: "print number 2"
-  filters:
-  - regex: 
-    save:
+  - name: "echo 2"
+    command: "echo 2"
+    description: "print number 2"
 
-- name: "echo 3"
-  command: "echo 3"
-  description: "print number 3"
-  filters:
-  - regex: 
-    save:
+  - name: "echo 3"
+    command: "echo 3"
+    description: "print number 3"
 
-- name: "echo 4"
-  command: "echo 4"
-  description: "print number 4"
-  filters:
-  - regex: 
-    save:
+  - name: "echo 4"
+    command: "echo 4"
+    description: "print number 4"
 
-- name: "get root fs usage"
-  command: "df -h /"
-  description: "Shows file system details for root partition"
-  filters:
-  - regex: 
-    save:
+  - name: "get root fs usage"
+    command: "df -h /"
+    description: "Shows file system details for root partition"
 
-- name: "get docker fs usage"
-  command: "df -h /var/lib/docker"
-  description: "Shows file system details for docker partition"
-  filters:
-  - regex: 
-    save:
+  - name: "get docker fs usage"
+    command: "df -h /var/lib/docker"
+    description: "Shows file system details for docker partition"
 
-- name: "get memory usage"
-  command: "free -m"
-  description: "Shows memory usage"
-  filters:
-  - regex: 
-    save:
+  - name: "get memory usage"
+    command: "free -m"
+    description: "Shows memory usage"
 
-- name: "get pid count"
-  command: "ps aux | wc -l"
-  description: "Shows the count for running process ids"
-  filters:
-  - regex: 
-    save:
+  - name: "get pid count"
+    command: "ps aux | wc -l"
+    description: "Shows the count for running process ids"
 
-- name: "get pid list"
-  command: "ps aux | wc -l"
-  description: "Shows the list of running process ids"
-  filters:
-  - regex: 
-    save:
+  - name: "get pid list"
+    command: "ps aux | wc -l"
+    description: "Shows the list of running process ids"
 
-- name: "get docker containers"
-  command: "docker ps"
-  description: "Shows the list of running docker containers"
-  filters:
-  - regex: 
-    save:
+  - name: "get docker containers"
+    command: "docker ps"
+    description: "Shows the list of running docker containers"
 
-- name: "get all docker containers"
-  command: "docker ps -a"
-  description: "Shows the list of all docker containers(running, started, stoppped and dead)"
-  filters:
-  - regex: 
-    save:
+  - name: "get all docker containers"
+    command: "docker ps -a"
+    description: "Shows the list of all docker containers(running, started, stoppped and dead)"
 
-- name: "get docker containers count"
-  command: "docker ps | wc -l"
-  description: "Shows the count for running docker containers"
-  filters:
-  - regex: 
-    save:
+  - name: "get docker containers count"
+    command: "docker ps | wc -l"
+    description: "Shows the count for running docker containers"
 
-- name: "get hostname"
-  command: "hostname"
-  description: "Shows the node hostname"
-  filters:
-  - regex: 
-    save:
+  - name: "get hostname"
+    command: "hostname"
+    description: "Shows the node hostname"
 
-- name: "get uptime"
-  command: 'uptime | cut -d\, -f1 | cut -d\  -f4,5'
-  description: "Shows the node uptime in days or hours:minutes"
-  filters:
-  - regex: 
-    save:
+  - name: "get uptime"
+    command: 'uptime | cut -d\, -f1 | cut -d\  -f4,5'
+    description: "Shows the node uptime in days or hours:minutes"
 
-- name: "get status"
-  command: 'h=`hostname`;
-u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`;
-k=`uname -r | cut -d\- -f1`;
-cu=`sar 2> /dev/null | tail -2 | head -1 | awk "{print \\$4}"`; if [[ $cu == "" ]]; then cu="N/A"; fi;
-mu=`sar -r 2> /dev/null | tail -2 | head -1 | awk "{print \\$5}"`; if [[ $mu == "" ]]; then mu="N/A"; fi;
-dfr=`df -h / --output=pcent | sed 1d`; if [[ $dfr == "" ]]; then dfr="N/A"; fi; 
-dfd=`df -h /var/lib/docker --output=pcent 2> /dev/null | sed 1d`; if [[ $dfd == "" ]]; then dfd="N/A"; fi; 
-echo -e "$h\t$u\t$k\t$cu\t$mu\t$dfr\t$dfd"
-'
-  header: "HOSTNAME\tUPTIME\tKERNEL\tCPU USAGE\tMEMORY USAGE\tDISK USAGE ROOT\tDISK USAGE DOCKER"
-  description: "Shows node status"
-  filters:
-  - regex: 
-    save:
+  - name: "get status"
+    command: 'h=`hostname`;
+  u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`;
+  k=`uname -r | cut -d\- -f1`;
+  cu=`sar 2> /dev/null | tail -2 | head -1 | awk "{print \\$4}"`; if [[ $cu == "" ]]; then cu="N/A"; fi;
+  mu=`sar -r 2> /dev/null | tail -2 | head -1 | awk "{print \\$5}"`; if [[ $mu == "" ]]; then mu="N/A"; fi;
+  dfr=`df -h / --output=pcent | sed 1d`; if [[ $dfr == "" ]]; then dfr="N/A"; fi; 
+  dfd=`df -h /var/lib/docker --output=pcent 2> /dev/null | sed 1d`; if [[ $dfd == "" ]]; then dfd="N/A"; fi; 
+  echo -e "$h\t$u\t$k\t$cu\t$mu\t$dfr\t$dfd"
+  '
+    header: "HOSTNAME\tUPTIME\tKERNEL\tCPU USAGE\tMEMORY USAGE\tDISK USAGE ROOT\tDISK USAGE DOCKER"
+    description: "Shows node status"
 
-- name: "install prerequisites"
-  command: 'systemctl status sysstat > /dev/null || bash -c "yum install -y sysstat && systemctl start sysstat ; systemctl enable sysstat"'
-  description: "Installs required packages and services"
-  filters:
-  - regex: 
-    save:
+  - name: "install prerequisites"
+    command: 'systemctl status sysstat > /dev/null || bash -c "yum install -y sysstat && systemctl start sysstat ; systemctl enable sysstat"'
+    description: "Installs required packages and services"
 
-- name: "get random return code"
-  command: 'exit $((RANDOM % 2))'
-  description: "Run a command with a random return code of 0 or 1"
-  filters:
-    - regex: 
-      save:
+  - name: "get random return code"
+    command: 'exit $((RANDOM % 2))'
+    description: "Run a command with a random return code of 0 or 1"
+    
