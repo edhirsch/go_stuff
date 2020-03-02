@@ -73,6 +73,8 @@ func getArgs() (string, string, string, string, error) {
 	argsSplit := regexp.MustCompile("--").Split(argsString, -1)
 	if len(argsSplit) == 0 {
 		otherCommandLabels = argsString
+	} else if len(argsSplit) == 1 {
+		otherCommandLabels = argsSplit[0]
 	} else {
 		otherCommandLabels = argsSplit[0]
 		commandExtraArgs = argsSplit[len(argsSplit)-1]
@@ -294,7 +296,7 @@ func showHelp() {
 
 func main() {
 
-	var yamlHostsFile = "hosts_local.yaml"
+	var yamlHostsFile = "hosts_cont_openatf.yaml"
 	var yamlCommandsFile = "commands"
 	var fullCommand string
 	AuthType = CertPassword
