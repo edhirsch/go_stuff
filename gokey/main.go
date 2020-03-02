@@ -11,6 +11,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	rnd "math/rand"
@@ -20,7 +22,7 @@ import (
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-func readKeyFromFile(path string) []byte {
+func readFile(path string) []byte {
 	content, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
@@ -30,7 +32,7 @@ func readKeyFromFile(path string) []byte {
 }
 
 func encrypt(keyFile string, message string) (encmess string, err error) {
-	key := readKeyFromFile(keyFile)
+	key := readFile(keyFile)
 	plainText := []byte(message)
 
 	block, err := aes.NewCipher(key)
@@ -50,13 +52,13 @@ func encrypt(keyFile string, message string) (encmess string, err error) {
 	stream.XORKeyStream(cipherText[aes.BlockSize:], plainText)
 
 	//returns to base64 encoded string
-	encmess = base64.URLEncoding.EncodeToString(cipherText)
+	encmess = base64.StdEncoding.EncodeToString(cipherText)
 	return
 }
 
 func decrypt(keyFile string, securemess string) (decodedmess string, err error) {
-	key := readKeyFromFile(keyFile)
-	cipherText, err := base64.URLEncoding.DecodeString(securemess)
+	key := readFile(keyFile)
+	cipherText, err := base64.StdEncoding.DecodeString(securemess)
 	if err != nil {
 		return
 	}
@@ -112,12 +114,15 @@ func generateKey() {
 	}
 }
 
-func getArgs() (string, error) {
+func getArgs() (string, string, error) {
 
-	if len(os.Args) < 2 {
-		return "", errors.New("error: insufficient arguments")
+	if len(os.Args) <= 1 {
+		return "", "", errors.New("error: insufficient arguments")
+	} else if len(os.Args) == 2 {
+		return os.Args[1], "", nil
+	} else {
+		return os.Args[1], os.Args[2], nil
 	}
-	return os.Args[1], nil
 }
 
 func inputString() (string, error) {
@@ -130,12 +135,78 @@ func inputString() (string, error) {
 	return string(text), nil
 }
 
+func encryptPasswordInFile(hostsFile string, keyFile string) {
+	var re = regexp.MustCompile(`(?m)password: (["|'].*["|'])$`)
+	var matched []string
+	text := string(readFile(hostsFile))
+	for _, match := range re.FindAllStringSubmatch(text, -1) {
+		if match[1] != "" {
+			matched = appendIfMissing(matched, match[1])
+		}
+
+	}
+	encryptedText := text
+	for _, match := range matched {
+		textPassword := trimFirstLastChars(match, 1, len(match)-1)
+		encryptedPassword, err := encrypt(keyFile, textPassword)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+		}
+		fmt.Println(textPassword, encryptedPassword)
+		encryptedText = strings.ReplaceAll(encryptedText, textPassword, encryptedPassword)
+	}
+	err := ioutil.WriteFile(hostsFile, []byte(encryptedText), 0644)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+	}
+}
+
+func decryptPasswordInFile(hostsFile string, keyFile string) {
+	var re = regexp.MustCompile(`(?m)password: (["|'].*["|'])$`)
+	var matched []string
+	text := string(readFile(hostsFile))
+	for _, match := range re.FindAllStringSubmatch(text, -1) {
+		if match[1] != "" {
+			matched = appendIfMissing(matched, match[1])
+		}
+
+	}
+	decryptedText := text
+	for _, match := range matched {
+		encryptedPassword := trimFirstLastChars(match, 1, len(match)-1)
+		textPassword, err := decrypt(keyFile, encryptedPassword)
+		if err != nil {
+			fmt.Printf("%v\n", err)
+		}
+		fmt.Println(textPassword, encryptedPassword)
+		decryptedText = strings.ReplaceAll(decryptedText, encryptedPassword, textPassword)
+	}
+	err := ioutil.WriteFile(hostsFile, []byte(decryptedText), 0644)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+	}
+}
+
+func trimFirstLastChars(str string, firstIndex int, lastIndex int) string {
+	r := []rune(str)
+	return string(r[firstIndex:lastIndex])
+}
+
+func appendIfMissing(strSlice []string, str string) []string {
+	for _, ele := range strSlice {
+		if ele == str {
+			return strSlice
+		}
+	}
+	return append(strSlice, str)
+}
+
 func main() {
 	folderName := os.Getenv("HOME") + "/.gorun/"
 	fileName := ".config"
 	fullPath := folderName + fileName
 
-	command, err := getArgs()
+	command, arg, err := getArgs()
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	}
@@ -143,24 +214,32 @@ func main() {
 	case "generate":
 		generateKey()
 	case "encrypt":
-		text, err := inputString()
-		if err != nil {
-			fmt.Printf("%v\n", err)
+		if arg == "" {
+			text, err := inputString()
+			if err != nil {
+				fmt.Printf("%v\n", err)
+			}
+			encrypted, err := encrypt(fullPath, text)
+			if err != nil {
+				fmt.Printf("%v\n", err)
+			}
+			fmt.Println(encrypted)
+		} else {
+			encryptPasswordInFile(arg, fullPath)
 		}
-		encrypted, err := encrypt(fullPath, text)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-		}
-		fmt.Println(encrypted)
 	case "decrypt":
-		text, err := inputString()
-		if err != nil {
-			fmt.Printf("%v\n", err)
+		if arg == "" {
+			text, err := inputString()
+			if err != nil {
+				fmt.Printf("%v\n", err)
+			}
+			decrypted, err := decrypt(fullPath, text)
+			if err != nil {
+				fmt.Printf("%v\n", err)
+			}
+			fmt.Println(decrypted)
+		} else {
+			decryptPasswordInFile(arg, fullPath)
 		}
-		decrypted, err := decrypt(fullPath, text)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-		}
-		fmt.Println(decrypted)
 	}
 }
