@@ -201,6 +201,17 @@ func appendIfMissing(strSlice []string, str string) []string {
 	return append(strSlice, str)
 }
 
+func showHelp() {
+	help := `
+gokey password encrypt / decrypt
+Usage:
+gokey generate          - Generate an encryption key
+gokey encrypt [<file>]  - Encrypt the passwords in a gorun hosts file
+gokey decrypt [<file>]  - Decrypt the passwords in a gorun hosts file
+`
+	fmt.Println(help)
+}
+
 func main() {
 	folderName := os.Getenv("HOME") + "/.gorun/"
 	fileName := ".config"
@@ -211,6 +222,8 @@ func main() {
 		fmt.Printf("%v\n", err)
 	}
 	switch command {
+	case "help", "--help":
+		showHelp()
 	case "generate":
 		generateKey()
 	case "encrypt":
@@ -241,5 +254,8 @@ func main() {
 		} else {
 			decryptPasswordInFile(arg, fullPath)
 		}
+	default:
+		showHelp()
 	}
+
 }
