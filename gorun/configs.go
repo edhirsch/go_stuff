@@ -8,38 +8,24 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"regexp"
-	"strings"
+	"os"
 
 	"github.com/spf13/viper"
 )
 
-func decryptPasswords(textBytes []byte, keyFile string) []byte {
-	text := string(textBytes)
-	var re = regexp.MustCompile(`(?m)password: (["|'].*["|'])$`)
-	var matched []string
-	for _, match := range re.FindAllStringSubmatch(text, -1) {
-		if match[1] != "" {
-			matched = appendIfMissing(matched, match[1])
-		}
-	}
-	decryptedText := text
-	for _, match := range matched {
-		encryptedPassword := trimFirstLastChars(match, 1, len(match)-1)
-		textPassword, err := decrypt(keyFile, encryptedPassword)
-		if err != nil {
-			fmt.Printf("%v\n", err)
-		}
-		decryptedText = strings.ReplaceAll(decryptedText, encryptedPassword, textPassword)
-	}
-	return []byte(decryptedText)
+// Config pre-defined structure
+type Config struct {
+	HostsFile    string
+	CommandsFile string
+	AuthType     string
 }
 
 func decrypt(keyFile string, securemess string) (decodedmess string, err error) {
 	key := readFile(keyFile)
 	cipherText, err := base64.StdEncoding.DecodeString(securemess)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("error: Password '%v' cannot be decrypted\n", securemess)
+		os.Exit(1)
 	}
 
 	block, err := aes.NewCipher(key)
@@ -75,18 +61,27 @@ func readFile(path string) []byte {
 	return content
 }
 
-func trimFirstLastChars(str string, firstIndex int, lastIndex int) string {
-	r := []rune(str)
-	return string(r[firstIndex:lastIndex])
-}
-
-func appendIfMissing(strSlice []string, str string) []string {
-	for _, ele := range strSlice {
-		if ele == str {
-			return strSlice
+func readConfigFile(fileName string) (Config, error) {
+	var config Config
+	var viperRuntime = viper.New()
+	viperRuntime.SetConfigFile(fileName) // name of config file (without extension)
+	viperRuntime.SetConfigType("yaml")
+	viperRuntime.AddConfigPath("/etc/gorun/")   // path to look for the config file in
+	viperRuntime.AddConfigPath("$HOME/.gorun/") // call multiple times to add many search paths
+	viperRuntime.AddConfigPath(".")             // optionally look for config in the working directory
+	if err := viperRuntime.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			fmt.Printf("Error finding yaml file: %s\n", err)
 		}
+		fmt.Printf("Error reading yaml file: %s\n", err)
+		return config, err
 	}
-	return append(strSlice, str)
+	err := viperRuntime.UnmarshalExact(&config)
+	if err != nil {
+		fmt.Printf("Unable to decode into struct, %v", err)
+	}
+
+	return config, nil
 }
 
 func readCommandsYamlFile(fileName string) ([]Command, error) {
@@ -150,56 +145,3 @@ func readHostsYamlFile(fileName string) (Nodes, error) {
 
 	return nodes, nil
 }
-
-// // ReadCommandsYamlFile function
-// func ReadCommandsYamlFile(fileName string) ([]Command, error) {
-
-// 	var yamlConfig []Command
-// 	yamlFile, err := ioutil.ReadFile(fileName)
-// 	if err != nil {
-// 		fmt.Printf("Error reading YAML file: %s\n", err)
-// 		return yamlConfig, err
-// 	}
-
-// 	err = yaml.Unmarshal([]byte(yamlFile), &yamlConfig)
-// 	if err != nil {
-// 		fmt.Printf("Error parsing YAML file: %s\n", err)
-// 		return yamlConfig, err
-// 	}
-
-// 	if Debug {
-// 		fmt.Println(yamlConfig)
-// 	}
-
-// 	return yamlConfig, nil
-// }
-
-// // ReadHostsYamlFile function
-// func ReadHostsYamlFile(fileName string, keyFile string) (Nodes, error) {
-
-// 	var yamlNodes []SSH
-// 	var node Node
-// 	var nodes Nodes
-
-// 	yamlFile, err := ioutil.ReadFile(fileName)
-// 	if err != nil {
-// 		fmt.Printf("Error reading YAML file: %s\n", err)
-// 		return nodes, err
-// 	}
-// 	yamlFileDecrypted := decryptPasswords(yamlFile, keyFile)
-// 	err = yaml.Unmarshal([]byte(yamlFileDecrypted), &yamlNodes)
-// 	if err != nil {
-// 		fmt.Printf("Error parsing YAML file: %s\n", err)
-// 		return nodes, err
-// 	}
-// 	for i := 0; i < len(yamlNodes); i++ {
-// 		node.Client = yamlNodes[i]
-// 		nodes = append(nodes, node)
-// 	}
-
-// 	if Debug {
-// 		fmt.Println(nodes)
-// 	}
-
-// 	return nodes, nil
-// }

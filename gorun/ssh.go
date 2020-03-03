@@ -11,7 +11,7 @@ import (
 )
 
 // DefaultConfig global variables
-var DefaultConfig Defaults
+var DefaultConfig SSHDefaults
 
 // SSH yaml pre-defined structures
 // ------------------------------------
@@ -24,15 +24,16 @@ type SSH struct {
 	client   *ssh.Client
 }
 
-// Defaults pre-defined struct
+// SSHDefaults pre-defined struct
 // ------------------------------------
-type Defaults struct {
+type SSHDefaults struct {
 	Port     string `yaml:"port"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
 }
 
 func (sshClient *SSH) init() {
+	fmt.Println(sshClient.Password)
 	if sshClient.User == "" {
 		sshClient.User = DefaultConfig.User
 	}
@@ -41,6 +42,12 @@ func (sshClient *SSH) init() {
 	}
 	if sshClient.Password == "" {
 		sshClient.Password = DefaultConfig.Password
+	} else {
+		var err error
+		sshClient.Password, err = decrypt(KeyFile, sshClient.Password)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 }
 

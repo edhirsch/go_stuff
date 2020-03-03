@@ -4,4 +4,5 @@
 3. Use vars as loop break condition.
 4. Use vars as next condition.
 5. Split code into multiple files
-6. Use https://github.com/spf13/viper for all config files !
+
+7.

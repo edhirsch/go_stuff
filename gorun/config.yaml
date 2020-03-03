@@ -1,0 +1,3 @@
+CommandsFile: "commands/commands.yaml"
+HostsFile: "hosts/hosts_docker.yaml"
+AuthType: "password"

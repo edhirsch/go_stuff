@@ -152,7 +152,6 @@ func encryptPasswordInFile(hostsFile string, keyFile string) {
 		if err != nil {
 			fmt.Printf("%v\n", err)
 		}
-		fmt.Println(textPassword, encryptedPassword)
 		encryptedText = strings.ReplaceAll(encryptedText, textPassword, encryptedPassword)
 	}
 	err := ioutil.WriteFile(hostsFile, []byte(encryptedText), 0644)

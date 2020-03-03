@@ -205,6 +205,7 @@ func runCommandParallel(command string, sshClient SSH, wg *sync.WaitGroup, c cha
 	err := sshClient.Connect(CertPassword)
 	if err != nil {
 		c <- fmt.Sprintln(err)
+		e <- err
 		return
 	}
 	sshClient.RefreshSession()
@@ -298,14 +299,14 @@ func showHelp() {
 }
 
 func main() {
-
-	var yamlHostsFile = "hosts_prod.yaml"
-	var yamlCommandsFile = "commands"
+	config, err := readConfigFile("config.yaml")
 	KeyFile = os.Getenv("HOME") + "/.gorun/.config"
+	if config.AuthType == "password" {
+		AuthType = CertPassword
+	}
 	var fullCommand string
-	AuthType = CertPassword
 
-	hosts, err := readHostsYamlFile(yamlHostsFile)
+	hosts, err := readHostsYamlFile(config.HostsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
@@ -314,7 +315,7 @@ func main() {
 		hosts[i].Client.init()
 	}
 
-	commands, err := readCommandsYamlFile(yamlCommandsFile)
+	commands, err := readCommandsYamlFile(config.CommandsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
@@ -351,7 +352,7 @@ func main() {
 		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
 		if err != nil {
 			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
-			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", yamlCommandsFile)
+			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", config.CommandsFile)
 			fmt.Printf("For running one time commands, you can use :\n")
 			fmt.Printf("gorun --exec '%v'\n\n", fullCommand)
 			fmt.Fprintf(os.Stderr, "%v\n", err)

@@ -1,0 +1,8 @@
+nodes:
+  - server: "sprint-rtp-cent.cisco.com"
+  - server: "sprint-rtp-cent2.cisco.com"
+  - server: "sprint-rtp-cent3.cisco.com"
+defaults:
+  port: "22"
+  user: "root"
+  password: '7csrTPOOcbpzZtOVku07LB8193+UsuBmkcI='
