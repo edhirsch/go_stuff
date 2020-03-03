@@ -10,12 +10,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// Defaults
-const (
-	DefaultPort     string = "22"
-	DefaultUser     string = "root"
-	DefaultPassword string = "Ci5c0k|cK!"
-)
+// DefaultConfig global variables
+var DefaultConfig Defaults
 
 // SSH yaml pre-defined structures
 // ------------------------------------
@@ -28,15 +24,23 @@ type SSH struct {
 	client   *ssh.Client
 }
 
+// Defaults pre-defined struct
+// ------------------------------------
+type Defaults struct {
+	Port     string `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+}
+
 func (sshClient *SSH) init() {
 	if sshClient.User == "" {
-		sshClient.User = DefaultUser
+		sshClient.User = DefaultConfig.User
 	}
 	if sshClient.Port == "" {
-		sshClient.Port = DefaultPort
+		sshClient.Port = DefaultConfig.Port
 	}
 	if sshClient.Password == "" {
-		sshClient.Password = DefaultPassword
+		sshClient.Password = DefaultConfig.Password
 	}
 }
 

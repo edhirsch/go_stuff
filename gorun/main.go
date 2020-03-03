@@ -22,6 +22,9 @@ const (
 	Debug             bool = false
 )
 
+// KeyFile ; generate via gokey
+var KeyFile string
+
 // AuthType ; CertPassword || CertPublicKeyFile
 var AuthType int
 
@@ -296,12 +299,13 @@ func showHelp() {
 
 func main() {
 
-	var yamlHostsFile = "hosts_cont_openatf.yaml"
+	var yamlHostsFile = "hosts_prod.yaml"
 	var yamlCommandsFile = "commands"
+	KeyFile = os.Getenv("HOME") + "/.gorun/.config"
 	var fullCommand string
 	AuthType = CertPassword
 
-	hosts, err := ReadHostsYamlFile(yamlHostsFile)
+	hosts, err := readHostsYamlFile(yamlHostsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
