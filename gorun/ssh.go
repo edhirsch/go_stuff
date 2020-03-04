@@ -33,7 +33,6 @@ type SSHDefaults struct {
 }
 
 func (sshClient *SSH) init() {
-	fmt.Println(sshClient.Password)
 	if sshClient.User == "" {
 		sshClient.User = DefaultConfig.User
 	}

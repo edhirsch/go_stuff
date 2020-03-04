@@ -13,12 +13,16 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Config pre-defined structure
-type Config struct {
-	HostsFile    string
-	CommandsFile string
-	AuthType     string
+// Configs pre-defined structure
+type Configs struct {
+	HostsFile      string
+	CommandsFile   string
+	AuthType       string
+	SummaryDetails string
 }
+
+// Config globals
+var Config Configs
 
 func decrypt(keyFile string, securemess string) (decodedmess string, err error) {
 	key := readFile(keyFile)
@@ -61,8 +65,8 @@ func readFile(path string) []byte {
 	return content
 }
 
-func readConfigFile(fileName string) (Config, error) {
-	var config Config
+func readConfigFile(fileName string) Configs {
+	var config Configs
 	var viperRuntime = viper.New()
 	viperRuntime.SetConfigFile(fileName) // name of config file (without extension)
 	viperRuntime.SetConfigType("yaml")
@@ -74,14 +78,15 @@ func readConfigFile(fileName string) (Config, error) {
 			fmt.Printf("Error finding yaml file: %s\n", err)
 		}
 		fmt.Printf("Error reading yaml file: %s\n", err)
-		return config, err
+		os.Exit(1)
 	}
 	err := viperRuntime.UnmarshalExact(&config)
 	if err != nil {
 		fmt.Printf("Unable to decode into struct, %v", err)
+		os.Exit(1)
 	}
 
-	return config, nil
+	return config
 }
 
 func readCommandsYamlFile(fileName string) ([]Command, error) {

@@ -150,6 +150,7 @@ func runCommandOnHosts(command Command, sshClients Nodes) {
 				sshClient.Output = output
 			}
 		}(&sshClients[i])
+		time.Sleep(10 * time.Millisecond)
 	}
 	wg.Wait()
 	tdiff := time.Now().Sub(tt1)
@@ -178,10 +179,14 @@ func printCommandSummary(sshClients Nodes, command string, duration string) {
 		serverAndPort := fmt.Sprintf("%v:%v", sshClients[i].Client.Server, sshClients[i].Client.Port)
 		if sshClients[i].ReturnCode > 0 {
 			failed++
-			summary = append(summary, fmt.Sprintf("%v -> %v", serverAndPort, Red("FAILED")))
+			if Config.SummaryDetails == "failed-only" || Config.SummaryDetails == "all" {
+				summary = append(summary, fmt.Sprintf("%v -> %v", serverAndPort, Red("FAILED")))
+			}
 		} else {
 			passed++
-			summary = append(summary, fmt.Sprintf("%v -> %v", serverAndPort, Green("PASSED")))
+			if Config.SummaryDetails == "passed-only" || Config.SummaryDetails == "all" {
+				summary = append(summary, fmt.Sprintf("%v -> %v", serverAndPort, Green("PASSED")))
+			}
 		}
 	}
 	total := len(sshClients)
@@ -299,14 +304,15 @@ func showHelp() {
 }
 
 func main() {
-	config, err := readConfigFile("config.yaml")
+
+	Config = readConfigFile("config.yaml")
 	KeyFile = os.Getenv("HOME") + "/.gorun/.config"
-	if config.AuthType == "password" {
+	if Config.AuthType == "password" {
 		AuthType = CertPassword
 	}
 	var fullCommand string
 
-	hosts, err := readHostsYamlFile(config.HostsFile)
+	hosts, err := readHostsYamlFile(Config.HostsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
@@ -315,7 +321,7 @@ func main() {
 		hosts[i].Client.init()
 	}
 
-	commands, err := readCommandsYamlFile(config.CommandsFile)
+	commands, err := readCommandsYamlFile(Config.CommandsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
@@ -352,7 +358,7 @@ func main() {
 		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
 		if err != nil {
 			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
-			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", config.CommandsFile)
+			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", Config.CommandsFile)
 			fmt.Printf("For running one time commands, you can use :\n")
 			fmt.Printf("gorun --exec '%v'\n\n", fullCommand)
 			fmt.Fprintf(os.Stderr, "%v\n", err)

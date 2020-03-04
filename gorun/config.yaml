@@ -1,3 +1,10 @@
+# Configuration file for gorun
+# ----------------------------
+# CommandsFile    - the commands configuration file location
+# HostsFile       - the hosts configuration file location
+# AuthType        - ssh authentication type; options: password
+# SummaryDetails  - command run summary details; options: all, failed-only or passed-only
 CommandsFile: "commands/commands.yaml"
-HostsFile: "hosts/hosts_docker.yaml"
+HostsFile: "hosts/hosts_prod.yaml"
 AuthType: "password"
+SummaryDetails: "failed-only"
