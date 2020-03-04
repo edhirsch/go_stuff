@@ -1,0 +1,21 @@
+commands:
+- name: "echo 0"
+  command: "echo 0"
+  description: "print number 0"
+
+- name: "echo 1"
+  command: "echo 1"
+  description: "print number 1"
+
+- name: "echo 2"
+  command: "echo 2"
+  description: "print number 2"
+
+- name: "echo 3"
+  command: "echo 3"
+  description: "print number 3"
+
+- name: "echo 4"
+  command: "echo 4"
+  description: "print number 4"
+  

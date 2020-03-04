@@ -10,7 +10,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// DefaultConfig global variables
+// DefaultConfig global instance containing the SSH defaults provided in the hosts file
 var DefaultConfig SSHDefaults
 
 // SSH yaml pre-defined structures

@@ -320,8 +320,7 @@ func main() {
 	for i := 0; i < len(hosts); i++ {
 		hosts[i].Client.init()
 	}
-
-	commands, err := readCommandsYamlFile(Config.CommandsFile)
+	commands, err := readAllCommandsFilesInFolder(Config.CommandsFolder)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
@@ -358,7 +357,7 @@ func main() {
 		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
 		if err != nil {
 			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
-			fmt.Printf("Please check the '%v' file for the list of available commands. \n\n", Config.CommandsFile)
+			fmt.Printf("Please check the commands files in '%v' for the list of available commands. \n\n", Config.CommandsFolder)
 			fmt.Printf("For running one time commands, you can use :\n")
 			fmt.Printf("gorun --exec '%v'\n\n", fullCommand)
 			fmt.Fprintf(os.Stderr, "%v\n", err)

@@ -1,23 +1,24 @@
 commands:
-  - name: "echo 0"
-    command: "echo 0"
-    description: "print number 0"
+# CPU
+  - name: "get cpu count"
+    command: "cat /proc/cpuinfo | grep processor | wc -l"
+    description: "Shows the cpu cores count."
 
-  - name: "echo 1"
-    command: "echo 1"
-    description: "print number 1"
+  - name: "get cpu usage"
+    command: 'sar 2> /dev/null | tail -2 | head -1 | awk "{print \$4}"'
+    description: "Shows the cpu utilization. Requires sysstat service."
 
-  - name: "echo 2"
-    command: "echo 2"
-    description: "print number 2"
+  - name: "get cpu top processes"
+    command: "ps aux | sort -nrk 3,3 | head -n 10"
+    description: "Shows the cpu utilization top 10 processes."
+# Memory
+  - name: "get memory size"
+    command: "vmstat -s -S M | grep 'total memory' | awk '{print $1}'"
+    description: "Shows the ram memory size."
 
-  - name: "echo 3"
-    command: "echo 3"
-    description: "print number 3"
-
-  - name: "echo 4"
-    command: "echo 4"
-    description: "print number 4"
+  - name: "get memory usage"
+    command: 'sar -r 2> /dev/null | tail -2 | head -1 | awk "{print \$5}"'
+    description: "Shows the memory utilization. Requires sysstat service."
 
   - name: "get root fs usage"
     command: "df -h /"

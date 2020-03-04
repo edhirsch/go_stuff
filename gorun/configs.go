@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/viper"
 )
@@ -16,12 +17,12 @@ import (
 // Configs pre-defined structure
 type Configs struct {
 	HostsFile      string
-	CommandsFile   string
+	CommandsFolder string
 	AuthType       string
 	SummaryDetails string
 }
 
-// Config globals
+// Config global instance containing the configuration provided in the config.yaml file
 var Config Configs
 
 func decrypt(keyFile string, securemess string) (decodedmess string, err error) {
@@ -43,13 +44,10 @@ func decrypt(keyFile string, securemess string) (decodedmess string, err error) 
 		return
 	}
 
-	//IV needs to be unique, but doesn't have to be secure.
-	//It's common to put it at the beginning of the ciphertext.
 	iv := cipherText[:aes.BlockSize]
 	cipherText = cipherText[aes.BlockSize:]
 
 	stream := cipher.NewCFBDecrypter(block, iv)
-	// XORKeyStream can work in-place if the two arguments are the same.
 	stream.XORKeyStream(cipherText, cipherText)
 
 	decodedmess = string(cipherText)
@@ -68,7 +66,7 @@ func readFile(path string) []byte {
 func readConfigFile(fileName string) Configs {
 	var config Configs
 	var viperRuntime = viper.New()
-	viperRuntime.SetConfigFile(fileName) // name of config file (without extension)
+	viperRuntime.SetConfigFile(fileName) // name of config file
 	viperRuntime.SetConfigType("yaml")
 	viperRuntime.AddConfigPath("/etc/gorun/")   // path to look for the config file in
 	viperRuntime.AddConfigPath("$HOME/.gorun/") // call multiple times to add many search paths
@@ -87,6 +85,30 @@ func readConfigFile(fileName string) Configs {
 	}
 
 	return config
+}
+
+func readAllCommandsFilesInFolder(folder string) ([]Command, error) {
+	var allCommands []Command
+	var files []string
+
+	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+		if filepath.Ext(path) == ".yaml" {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		err := errors.New(fmt.Sprintln("error: no yaml file found in folder ", folder))
+		return nil, err
+	}
+	for _, file := range files {
+		commands, err := readCommandsYamlFile(file)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+		}
+		allCommands = append(allCommands, commands...)
+	}
+	return allCommands, nil
 }
 
 func readCommandsYamlFile(fileName string) ([]Command, error) {
@@ -116,10 +138,9 @@ func readHostsYamlFile(fileName string) (Nodes, error) {
 	var myStruct []SSH
 	var node Node
 	var nodes Nodes
-	// var defaults Defaults
 	var viperRuntime = viper.New()
 
-	viperRuntime.SetConfigName(fileName) // name of config file (without extension)
+	viperRuntime.SetConfigName(fileName) // name of config file
 	viperRuntime.SetConfigType("yaml")
 	viperRuntime.AddConfigPath("/etc/gorun/")   // path to look for the config file in
 	viperRuntime.AddConfigPath("$HOME/.gorun/") // call multiple times to add many search paths
