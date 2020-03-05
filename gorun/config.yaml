@@ -5,6 +5,8 @@
 # AuthType        - ssh authentication type; options: password
 # SummaryDetails  - command run summary details; options: all, failed-only or passed-only
 CommandsFolder: "commands"
-HostsFile: "hosts/hosts_docker.yaml"
+HostsFile: "hosts/hosts_prod.yaml"
+SSHDefaultTimeout: 3
+CommandDefaultTimeout: 300
 AuthType: "password"
 SummaryDetails: "failed-only"

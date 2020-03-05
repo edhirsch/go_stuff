@@ -83,7 +83,7 @@ func (sshClient *SSH) Connect(mode int) error {
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
 		},
-		Timeout: time.Second * DefaultTimeout,
+		Timeout: time.Duration(Config.SSHDefaultTimeout) * time.Second,
 	}
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%s", sshClient.Server, sshClient.Port), sshConfig)

@@ -16,10 +16,12 @@ import (
 
 // Configs pre-defined structure
 type Configs struct {
-	HostsFile      string
-	CommandsFolder string
-	AuthType       string
-	SummaryDetails string
+	HostsFile             string
+	CommandsFolder        string
+	AuthType              string
+	SummaryDetails        string
+	SSHDefaultTimeout     int
+	CommandDefaultTimeout int
 }
 
 // Config global instance containing the configuration provided in the config.yaml file

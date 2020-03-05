@@ -18,7 +18,6 @@ import (
 const (
 	CertPassword           = 1
 	CertPublicKeyFile      = 2
-	DefaultTimeout         = 3 // second
 	Debug             bool = false
 )
 
@@ -36,6 +35,7 @@ type Command struct {
 	Args        string `yaml:"args"`
 	Description string `yaml:"description"`
 	Header      string `yaml:"header"`
+	Timeout     int    `yaml:"timeout"`
 	Output      string
 	ReturnCode  int
 }
@@ -121,6 +121,8 @@ func getSummaryBanner(command string, duration string, passed string, failed str
 
 func runCommandOnHosts(command Command, sshClients Nodes) {
 	var wg sync.WaitGroup
+	var timeout int
+
 	tt1 := time.Now()
 	for i := 0; i < len(sshClients); i++ {
 		c := make(chan string)
@@ -128,6 +130,14 @@ func runCommandOnHosts(command Command, sshClients Nodes) {
 		t1 := time.Now()
 		wg.Add(1)
 		runCommand := command.Command + " " + command.Args
+		if command.Timeout != 0 {
+			timeout = command.Timeout
+		} else {
+			timeout = Config.CommandDefaultTimeout
+		}
+		if timeout > 0 {
+			runCommand = fmt.Sprintf("timeout --kill-after=%v %v bash -c '%v'", timeout, timeout, runCommand)
+		}
 		go runCommandParallel(runCommand, sshClients[i].Client, &wg, c, e)
 		go func(sshClient *Node) {
 			output := <-c
@@ -304,7 +314,6 @@ func showHelp() {
 }
 
 func main() {
-
 	Config = readConfigFile("config.yaml")
 	KeyFile = os.Getenv("HOME") + "/.gorun/.config"
 	if Config.AuthType == "password" {

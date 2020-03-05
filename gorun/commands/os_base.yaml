@@ -55,6 +55,7 @@ commands:
   - name: "get hostname"
     command: "hostname"
     description: "Shows the node hostname"
+    timeout: 5
 
   - name: "get uptime"
     command: 'uptime | cut -d\, -f1 | cut -d\  -f4,5'
@@ -64,9 +65,11 @@ commands:
     command: 'h=`hostname`;
   u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`;
   k=`uname -r | cut -d\- -f1`;
-  echo -e "$h\t$u\t$k"
+  cc=`cat /proc/cpuinfo | grep processor | wc -l`;
+  ms=`vmstat -s -S M | grep "total memory" | awk "{print \\$1}"`;
+  echo -e "$h\t$u\t$k\t$cc Cores\t$ms GB"
   '
-    header: "HOSTNAME\tUPTIME\tKERNEL"
+    header: "HOSTNAME\tUPTIME\tKERNEL\tCPU COUNT\tMEMORY SIZE"
     description: "Shows node info"
 
   - name: "get status"
