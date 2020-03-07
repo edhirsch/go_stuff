@@ -10,6 +10,9 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// KeyFile ; generate via gokey
+var KeyFile string
+
 // DefaultConfig global instance containing the SSH defaults provided in the hosts file
 var DefaultConfig SSHDefaults
 
@@ -32,7 +35,18 @@ type SSHDefaults struct {
 	Password string `yaml:"password"`
 }
 
-func (sshClient *SSH) init() {
+// Node pre-defined struct
+// -----------------------
+type Node struct {
+	Client     SSH
+	Output     string
+	ReturnCode int
+}
+
+// Nodes pre-defined struct
+type Nodes []Node
+
+func (sshClient *SSH) initHosts() {
 	if sshClient.User == "" {
 		sshClient.User = DefaultConfig.User
 	}
@@ -68,9 +82,9 @@ func (sshClient *SSH) Connect(mode int) error {
 
 	var sshConfig *ssh.ClientConfig
 	var auth []ssh.AuthMethod
-	if mode == CertPassword {
+	if mode == 1 {
 		auth = []ssh.AuthMethod{ssh.Password(sshClient.Password)}
-	} else if mode == CertPublicKeyFile {
+	} else if mode == 2 {
 		auth = []ssh.AuthMethod{sshClient.readPublicKeyFile(sshClient.Password)}
 	} else {
 		err := errors.New(fmt.Sprintln("error: does not support mode: ", mode))

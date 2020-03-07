@@ -2,11 +2,11 @@
 # ----------------------------
 # CommandsFolder  - the commands configuration files location
 # HostsFile       - the hosts configuration file location
-# AuthType        - ssh authentication type; options: password
+# AuthType        - ssh authentication type; options: 1 for password, 2 for key (disabled atm)
 # SummaryDetails  - command run summary details; options: all, failed-only or passed-only
 CommandsFolder: "commands"
-HostsFile: "hosts/hosts_prod.yaml"
+HostsFile: "hosts/hosts_docker.yaml"
 SSHDefaultTimeout: 3
 CommandDefaultTimeout: 300
-AuthType: "password"
+AuthType: 1
 SummaryDetails: "failed-only"

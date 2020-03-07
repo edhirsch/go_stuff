@@ -7,10 +7,8 @@ play :
 
 run:
 1. Add relevant commands
-2. Add all relevand global vars to config.yaml
+2. Add all relevant global vars to config.yaml
 3. Add HostsFolder in config.yaml
-4. Add timeout in command
-5. Hosts pattern list separated by ","
 
 key:
 1.

@@ -18,7 +18,7 @@ import (
 type Configs struct {
 	HostsFile             string
 	CommandsFolder        string
-	AuthType              string
+	AuthType              int
 	SummaryDetails        string
 	SSHDefaultTimeout     int
 	CommandDefaultTimeout int
