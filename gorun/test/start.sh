@@ -2,7 +2,7 @@
 
 FILENAME="hosts_docker.yaml"
 STARTPORT=2000
-ENDPORT=2009
+ENDPORT=2004
 
 docker build -t centos:ssh .
 for i in `seq $STARTPORT $ENDPORT`; do echo $i; done | xargs -n 1 -I % bash -c 'docker run -d -p %:22 centos:ssh; sleep 0.3'

@@ -124,7 +124,6 @@ func main() {
 
 	default:
 		matchedCommand, partialCommands, err := matchCommand(fullCommand, commands)
-		fmt.Println(matchedCommand, partialCommands)
 		if err != nil {
 			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
 			fmt.Printf("Please check the commands files in '%v' for the list of available commands. \n\n", Config.CommandsFolder)

@@ -1,67 +1,107 @@
 commands:
 # CPU
-  - name: "get cpu count"
+  - name: "cpu count"
     command: "cat /proc/cpuinfo | grep processor | wc -l"
-    description: "Shows the cpu cores count."
+    description: "Shows the cpu cores count"
 
-  - name: "get cpu usage"
+  - name: "cpu usage"
     command: 'sar 2> /dev/null | tail -2 | head -1 | awk "{print \$4}"'
-    description: "Shows the cpu utilization. Requires sysstat service."
+    description: "Shows the cpu utilization using sar. Requires sysstat service"
 
-  - name: "get cpu top processes"
+  - name: "cpu top processes"
     command: "ps aux | sort -nrk 3,3 | head -n 10"
-    description: "Shows the cpu utilization top 10 processes."
+    description: "Shows the highest 10 cpu using processes"
+
 # Memory
-  - name: "get memory size"
+  - name: "memory size"
     command: "vmstat -s -S M | grep 'total memory' | awk '{print $1}'"
-    description: "Shows the ram memory size."
+    description: "Shows the ram memory size"
 
-  - name: "get memory usage"
+  - name: "memory usage sar"
     command: 'sar -r 2> /dev/null | tail -2 | head -1 | awk "{print \$5}"'
-    description: "Shows the memory utilization. Requires sysstat service."
+    description: "Shows the memory utilization using sar. Requires sysstat service"
 
-  - name: "get root fs usage"
-    command: "df -h /"
-    description: "Shows file system details for root partition"
-
-  - name: "get docker fs usage"
-    command: "df -h /var/lib/docker"
-    description: "Shows file system details for docker partition"
-
-  - name: "get memory usage"
+  - name: "memory usage"
     command: "free -m"
     description: "Shows memory usage"
 
-  - name: "get pid count"
+  - name: "memory top processes"
+    command: "ps aux | sort -nrk 4,3 | head -n 10"
+    description: "Shows the highest 10 memory using processes"
+
+# Disk
+  - name: "disk drives"
+    command: "fdisk -l | grep -E '^Disk /dev' | grep -v mapper"
+    description: "Shows physical disks"
+
+  - name: "disk partitions"
+    command: "fdisk -l | grep -E '^/dev' | grep -v mapper"
+    description: "Shows partitions on physical disks"
+
+  - name: "disk pv"
+    command: "pvs"
+    description: "Shows lvm physical volumes"
+
+  - name: "disk vg"
+    command: "vgs"
+    description: "Shows lvm volume groups"
+
+  - name: "disk lv"
+    command: "lvs"
+    description: "Shows lvm logical volumes"
+
+# File system
+  - name: "fs usage all"
+    command: "df -h"
+    description: "Shows file system details for root partition"
+
+  - name: "fs usage root"
+    command: "df -h /"
+    description: "Shows file system details for root partition"
+
+  - name: "fs usage docker"
+    command: "df -h /var/lib/docker"
+    description: "Shows file system details for docker partition"
+
+  - name: "fs mounts local"
+    command: 'mount | grep -E "^/dev" | grep -v nfs | sort'
+    description: "Shows file system local mounts"
+
+  - name: "fs mounts nfs"
+    command: 'mount | grep -E " nfs " | sort'
+    description: "Shows file system nfs mounts"
+
+  - name: "fs mounts count"
+    command: 'mount | wc -l'
+    description: "Shows file system mounts count"
+
+# Processes
+  - name: "process count"
     command: "ps aux | wc -l"
     description: "Shows the count for running process ids"
 
-  - name: "get pid list"
-    command: "ps aux | wc -l"
+  - name: "process list"
+    command: "ps aux"
     description: "Shows the list of running process ids"
 
-  - name: "get docker containers"
-    command: "docker ps"
-    description: "Shows the list of running docker containers"
+  - name: "process tree"
+    command: "ps -ef --forest"
+    description: "Shows the list of running process ids in tree format"
 
-  - name: "get all docker containers"
-    command: "docker ps -a"
-    description: "Shows the list of all docker containers(running, started, stoppped and dead)"
+  - name: "process threads"
+    command: "ps -efT"
+    description: "Shows the list of running process ids in tree format"
 
-  - name: "get docker containers count"
-    command: "docker ps | wc -l"
-    description: "Shows the count for running docker containers"
-
-  - name: "get hostname"
+# Various
+  - name: "hostname"
     command: "hostname"
     description: "Shows the node hostname"
-    timeout: 5
 
-  - name: "get uptime"
+  - name: "uptime"
     command: 'uptime | cut -d\, -f1 | cut -d\  -f4,5'
     description: "Shows the node uptime in days or hours:minutes"
 
-  - name: "get info"
+  - name: "info"
     command: 'h=`hostname`;
   u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`;
   k=`uname -r | cut -d\- -f1`;
@@ -72,7 +112,7 @@ commands:
     header: "HOSTNAME\tUPTIME\tKERNEL\tCPU COUNT\tMEMORY SIZE"
     description: "Shows node info"
 
-  - name: "get status"
+  - name: "status"
     command: 'h=`hostname`;
   p=`ps aux | wc -l`;
   t=`ps -efT | wc -l`
@@ -91,7 +131,4 @@ commands:
     command: 'systemctl status sysstat > /dev/null || bash -c "yum install -y sysstat && systemctl start sysstat ; systemctl enable sysstat"'
     description: "Installs required packages and services"
 
-  - name: "get random return code"
-    command: 'exit $((RANDOM % 2))'
-    description: "Run a command with a random return code of 0 or 1"
     

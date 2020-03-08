@@ -2,7 +2,7 @@
 # ----------------------------
 # CommandsFolder  - the commands configuration files location
 # HostsFile       - the hosts configuration file location
-# AuthType        - ssh authentication type; options: 1 for password, 2 for key (disabled atm)
+# AuthType        - ssh authentication type; options: 1 for password, 2 for key (disabled)
 # SummaryDetails  - command run summary details; options: all, failed-only or passed-only
 CommandsFolder: "commands"
 HostsFile: "hosts/hosts_docker.yaml"
