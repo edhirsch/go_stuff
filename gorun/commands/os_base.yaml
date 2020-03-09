@@ -8,8 +8,8 @@ commands:
     command: 'sar 2> /dev/null | tail -2 | head -1 | awk "{print \$4}"'
     description: "Shows the cpu utilization using sar. Requires sysstat service"
 
-  - name: "cpu top processes"
-    command: "ps aux | sort -nrk 3,3 | head -n 10"
+  - name: "cpu top process"
+    command: "ps aux | sort -nr -k 3 | head -n 10"
     description: "Shows the highest 10 cpu using processes"
 
 # Memory
@@ -25,8 +25,8 @@ commands:
     command: "free -m"
     description: "Shows memory usage"
 
-  - name: "memory top processes"
-    command: "ps aux | sort -nrk 4,3 | head -n 10"
+  - name: "memory top process"
+    command: "ps aux | sort -nr -k 4 | head -n 10"
     description: "Shows the highest 10 memory using processes"
 
 # Disk

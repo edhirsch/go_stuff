@@ -24,7 +24,7 @@ func getArgs() (cliArgs, error) {
 	cli.hostPattern = args[0]
 	cli.primaryLabel = args[1]
 	argsString := strings.Join(args[2:], " ")
-	argsSplit := regexp.MustCompile("--").Split(argsString, -1)
+	argsSplit := regexp.MustCompile(" -- ").Split(argsString, -1)
 	if len(argsSplit) == 0 {
 		cli.extraLabels = argsString
 	} else if len(argsSplit) == 1 {

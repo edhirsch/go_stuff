@@ -84,10 +84,14 @@ func runCommandOnHosts(command Command, sshClients Nodes) {
 		e := make(chan error)
 		t1 := time.Now()
 		wg.Add(1)
-		runCommand := command.Command + " " + command.Args
+		runCommand := command.Command
+		if command.Args != "" {
+			runCommand = runCommand + " " + command.Args
+		}
 
 		go runCommandParallel(runCommand, command.Timeout, sshClients[i].Client, &wg, c, e)
 		go func(sshClient *Node) {
+			defer wg.Done()
 			output := <-c
 			err := <-e
 			if err != nil {
@@ -164,7 +168,6 @@ func printCommandSummary(sshClients Nodes, command string, duration string) {
 }
 
 func runCommandParallel(command string, timeout int, sshClient SSH, wg *sync.WaitGroup, c chan string, e chan error) {
-	defer wg.Done()
 	if timeout > 0 {
 		command = fmt.Sprintf("timeout --kill-after=%v %v bash -c '%v'", timeout, timeout, command)
 	}
@@ -174,11 +177,12 @@ func runCommandParallel(command string, timeout int, sshClient SSH, wg *sync.Wai
 		e <- err
 		return
 	}
+
 	sshClient.RefreshSession()
 	commandOutput, err := sshClient.RunCommand(command)
-
 	c <- commandOutput
 	e <- err
+
 	sshClient.Close()
 }
 
