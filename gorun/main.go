@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -13,6 +15,36 @@ type cliArgs struct {
 	primaryLabel string
 	extraLabels  string
 	extraArgs    string
+}
+
+func readStdinPipe() string {
+
+	var pipe string
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return ""
+	}
+
+	if info.Mode()&os.ModeCharDevice != 0 || info.Size() <= 0 {
+		return ""
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	var output []rune
+
+	for {
+		input, _, err := reader.ReadRune()
+		if err != nil && err == io.EOF {
+			break
+		}
+		output = append(output, input)
+	}
+
+	for _, rune := range output {
+		pipe = pipe + fmt.Sprintf("%c", rune)
+	}
+
+	return pipe
 }
 
 func getArgs() (cliArgs, error) {
@@ -71,10 +103,11 @@ func showHelp() {
 func main() {
 	Config = readConfigFile("config.yaml")
 	KeyFile = os.Getenv("HOME") + "/.gorun/.config"
+	pipe := readStdinPipe()
 
 	var fullCommand string
 
-	hosts, err := readHostsYamlFile(Config.HostsFile)
+	hosts, err := readAllHostsFilesInFolder(Config.HostsFolder, Config.HostsFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
@@ -113,9 +146,18 @@ func main() {
 
 	case "--exec":
 		var execCommand Command
-		execCommand.Command = cli.extraLabels
-		execCommand.Args = cli.extraArgs
-		execCommand.Name = cli.extraLabels
+		if len(pipe) > 0 {
+			if cli.extraLabels != "" {
+				execCommand.Command = fmt.Sprintf("%v '%v'", cli.extraLabels, pipe)
+			} else {
+				execCommand.Command = pipe
+			}
+			execCommand.Name = "pipe command(s)"
+		} else {
+			execCommand.Command = cli.extraLabels
+			execCommand.Args = cli.extraArgs
+			execCommand.Name = cli.extraLabels
+		}
 		runCommandOnHosts(execCommand, matchedHosts)
 
 	case "--list":

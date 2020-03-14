@@ -8,7 +8,7 @@ play :
 run:
 1. Add relevant commands
 2. Add all relevant global vars to config.yaml
-3. Add HostsFolder in config.yaml
+3. Copy file to/from
 
 key:
 1.

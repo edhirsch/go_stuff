@@ -44,6 +44,10 @@ func printTabbedTable(lines []string) {
 
 func getDefaultBanner(command string, duration string, rc string, sshClient SSH) string {
 	var banner string
+	command = strings.ReplaceAll(command, "\n", " ")
+	if len(command) > 27 {
+		command = fmt.Sprintf("%v...", command[0:27])
+	}
 	x := strings.Repeat("-",
 		utf8.RuneCountInString(sshClient.Server)+
 			utf8.RuneCountInString(sshClient.Port)+

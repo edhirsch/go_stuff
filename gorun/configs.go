@@ -16,6 +16,7 @@ import (
 
 // Configs pre-defined structure
 type Configs struct {
+	HostsFolder           string
 	HostsFile             string
 	CommandsFolder        string
 	AuthType              int
@@ -110,6 +111,7 @@ func readAllCommandsFilesInFolder(folder string) ([]Command, error) {
 		}
 		allCommands = append(allCommands, commands...)
 	}
+
 	return allCommands, nil
 }
 
@@ -133,6 +135,37 @@ func readCommandsYamlFile(fileName string) ([]Command, error) {
 		fmt.Printf("Error parsing YAML file: %s\n", err)
 	}
 	return myStruct, nil
+}
+
+func readAllHostsFilesInFolder(folder string, file string) (Nodes, error) {
+
+	var allNodes Nodes
+	var files []string
+	if file == "" || file == "*" || file == "*.yaml" {
+		err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+			if filepath.Ext(path) == ".yaml" {
+				files = append(files, path)
+			}
+			return nil
+		})
+		if err != nil {
+			err := errors.New(fmt.Sprintln("error: no yaml file found in folder ", folder))
+			return nil, err
+		}
+	} else {
+		filePath := fmt.Sprintf("%v/%v", folder, file)
+		files = append(files, filePath)
+	}
+
+	for _, file := range files {
+		nodes, err := readHostsYamlFile(file)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+		}
+		allNodes = append(allNodes, nodes...)
+	}
+
+	return allNodes, nil
 }
 
 func readHostsYamlFile(fileName string) (Nodes, error) {
