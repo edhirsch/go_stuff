@@ -22,6 +22,7 @@ type Command struct {
 	Description string `yaml:"description"`
 	Header      string `yaml:"header"`
 	Timeout     int    `yaml:"timeout"`
+	Pipe        string
 	Output      string
 	ReturnCode  int
 }
@@ -93,7 +94,7 @@ func runCommandOnHosts(command Command, sshClients Nodes) {
 			runCommand = runCommand + " " + command.Args
 		}
 
-		go runCommandParallel(runCommand, command.Timeout, sshClients[i].Client, &wg, c, e)
+		go runCommandParallel(runCommand, command.Pipe, command.Timeout, sshClients[i].Client, &wg, c, e)
 		go func(sshClient *Node) {
 			defer wg.Done()
 			output := <-c
@@ -171,7 +172,7 @@ func printCommandSummary(sshClients Nodes, command string, duration string) {
 	}
 }
 
-func runCommandParallel(command string, timeout int, sshClient SSH, wg *sync.WaitGroup, c chan string, e chan error) {
+func runCommandParallel(command string, pipe string, timeout int, sshClient SSH, wg *sync.WaitGroup, c chan string, e chan error) {
 	if timeout > 0 {
 		command = fmt.Sprintf("timeout --kill-after=%v %v bash -c '%v'", timeout, timeout, command)
 	}
@@ -183,7 +184,7 @@ func runCommandParallel(command string, timeout int, sshClient SSH, wg *sync.Wai
 	}
 
 	sshClient.RefreshSession()
-	commandOutput, err := sshClient.RunCommand(command)
+	commandOutput, err := sshClient.RunCommand(command, pipe)
 	c <- commandOutput
 	e <- err
 

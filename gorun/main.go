@@ -146,18 +146,10 @@ func main() {
 
 	case "--exec":
 		var execCommand Command
-		if len(pipe) > 0 {
-			if cli.extraLabels != "" {
-				execCommand.Command = fmt.Sprintf("%v '%v'", cli.extraLabels, pipe)
-			} else {
-				execCommand.Command = pipe
-			}
-			execCommand.Name = "pipe command(s)"
-		} else {
-			execCommand.Command = cli.extraLabels
-			execCommand.Args = cli.extraArgs
-			execCommand.Name = cli.extraLabels
-		}
+		execCommand.Command = cli.extraLabels
+		execCommand.Args = cli.extraArgs
+		execCommand.Name = cli.extraLabels
+		execCommand.Pipe = pipe
 		runCommandOnHosts(execCommand, matchedHosts)
 
 	case "--list":
@@ -181,6 +173,7 @@ func main() {
 			return
 		}
 		matchedCommand.Args = cli.extraArgs
+		matchedCommand.Pipe = pipe
 		runCommandOnHosts(matchedCommand, matchedHosts)
 	}
 }

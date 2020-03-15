@@ -109,7 +109,17 @@ func (sshClient *SSH) Connect(mode int) error {
 }
 
 // RunCommand function
-func (sshClient *SSH) RunCommand(command string) (string, error) {
+func (sshClient *SSH) RunCommand(command string, pipe string) (string, error) {
+	if pipe != "" {
+		go func() {
+			w, err := sshClient.session.StdinPipe()
+			defer w.Close()
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Fprint(w, pipe)
+		}()
+	}
 	output, err := sshClient.session.CombinedOutput(command)
 	if len(output) > 0 {
 		output = output[:len(output)-1]
@@ -128,7 +138,6 @@ func (sshClient *SSH) RefreshSession() {
 		sshClient.Close()
 		return
 	}
-
 	sshClient.session = session
 }
 
