@@ -174,6 +174,7 @@ func readHostsYamlFile(fileName string) (Nodes, error) {
 	var node Node
 	var nodes Nodes
 	var viperRuntime = viper.New()
+	var defaults SSHDefaults
 
 	viperRuntime.SetConfigName(fileName) // name of config file
 	viperRuntime.SetConfigType("yaml")
@@ -187,21 +188,24 @@ func readHostsYamlFile(fileName string) (Nodes, error) {
 		fmt.Printf("Error reading YAML file: %s\n", err)
 		return nodes, err
 	}
-	err := viperRuntime.UnmarshalKey("nodes", &myStruct)
+
+	err := viperRuntime.UnmarshalKey("defaults", &defaults)
+	if err != nil {
+		fmt.Printf("Error parsing YAML file: %s\n", err)
+	}
+	defaults.Password, err = decrypt(KeyFile, defaults.Password)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = viperRuntime.UnmarshalKey("nodes", &myStruct)
 	if err != nil {
 		fmt.Printf("Error parsing YAML file: %s\n", err)
 	}
 	for i := 0; i < len(myStruct); i++ {
 		node.Client = myStruct[i]
+		node.Client.Defaults = defaults
 		nodes = append(nodes, node)
-	}
-	err = viperRuntime.UnmarshalKey("defaults", &DefaultConfig)
-	if err != nil {
-		fmt.Printf("Error parsing YAML file: %s\n", err)
-	}
-	DefaultConfig.Password, err = decrypt(KeyFile, DefaultConfig.Password)
-	if err != nil {
-		fmt.Println(err)
 	}
 
 	return nodes, nil

@@ -62,6 +62,8 @@ nodes:
   - server: "kick-ful-cent3.cisco.com"
   - server: "kick-ful-sel1.cisco.com"
   - server: "kick-ful-sel2.cisco.com"
+  - server: "kick-ful-sel3.cisco.com"
+  - server: "kick-ful-sel4.cisco.com"
   - server: "kick-rtp-caas1.cisco.com"
   - server: "kick-rtp-caas2.cisco.com"
   - server: "kick-rtp-caas3.cisco.com"
@@ -107,4 +109,4 @@ nodes:
 defaults:
   port: "22"
   user: "root"
-  password: '7csrTPOOcbpzZtOVku07LB8193+UsuBmkcI='
+  password: '5e79yi22zU5LqzXhDvFr0v1yNTYuWQQv+Oo='

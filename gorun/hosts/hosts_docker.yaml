@@ -1,7 +1,11 @@
 nodes:
   - server: "localhost"
+    port: "2002"
+  - server: "localhost"
+    port: "2001"
+  - server: "localhost"
     port: "2000"
 defaults:
   port: 22
   user: root
-  password: 'GuVy3QqifBVQStQ6l+fqkXvleUDK'
+  password: 'aCE01dTDJPCC/iDlM06VeaFJdI6+'

@@ -8,7 +8,7 @@
 CommandsFolder: "commands"
 HostsFolder: "hosts"
 HostsFile: "*.yaml"
-SSHDefaultTimeout: 3
+SSHDefaultTimeout: 10
 CommandDefaultTimeout: 300
 AuthType: 1
 SummaryDetails: "failed-only"

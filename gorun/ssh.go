@@ -13,9 +13,6 @@ import (
 // KeyFile ; generate via gokey
 var KeyFile string
 
-// DefaultConfig global instance containing the SSH defaults provided in the hosts file
-var DefaultConfig SSHDefaults
-
 // SSH yaml pre-defined structures
 // ------------------------------------
 type SSH struct {
@@ -23,6 +20,7 @@ type SSH struct {
 	Port     string `yaml:"port"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
+	Defaults SSHDefaults
 	session  *ssh.Session
 	client   *ssh.Client
 }
@@ -48,13 +46,13 @@ type Nodes []Node
 
 func (sshClient *SSH) initHosts() {
 	if sshClient.User == "" {
-		sshClient.User = DefaultConfig.User
+		sshClient.User = sshClient.Defaults.User
 	}
 	if sshClient.Port == "" {
-		sshClient.Port = DefaultConfig.Port
+		sshClient.Port = sshClient.Defaults.Port
 	}
 	if sshClient.Password == "" {
-		sshClient.Password = DefaultConfig.Password
+		sshClient.Password = sshClient.Defaults.Password
 	} else {
 		var err error
 		sshClient.Password, err = decrypt(KeyFile, sshClient.Password)

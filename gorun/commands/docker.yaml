@@ -10,3 +10,11 @@ commands:
   - name: "docker containers count"
     command: "docker ps | wc -l"
     description: "Shows the count for running docker containers"
+
+  - name: "docker images"
+    command: "docker images"
+    description: "Shows the list of all docker image tags"
+
+  - name: "docker images all"
+    command: "docker images -a"
+    description: "Shows the list of all docker image SHAs"
