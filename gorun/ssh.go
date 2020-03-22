@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"time"
 
+	"github.com/bramvdbogaerde/go-scp"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -16,13 +18,14 @@ var KeyFile string
 // SSH yaml pre-defined structures
 // ------------------------------------
 type SSH struct {
-	Server   string `yaml:"server"`
-	Port     string `yaml:"port"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	Defaults SSHDefaults
-	session  *ssh.Session
-	client   *ssh.Client
+	Server    string `yaml:"server"`
+	Port      string `yaml:"port"`
+	User      string `yaml:"user"`
+	Password  string `yaml:"password"`
+	Defaults  SSHDefaults
+	session   *ssh.Session
+	client    *ssh.Client
+	sshConfig *ssh.ClientConfig
 }
 
 // SSHDefaults pre-defined struct
@@ -97,6 +100,7 @@ func (sshClient *SSH) Connect(mode int) error {
 		},
 		Timeout: time.Duration(Config.SSHDefaultTimeout) * time.Second,
 	}
+	sshClient.sshConfig = sshConfig
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%s", sshClient.Server, sshClient.Port), sshConfig)
 	if err != nil {
@@ -141,6 +145,40 @@ func (sshClient *SSH) RefreshSession() {
 
 // Close function
 func (sshClient *SSH) Close() {
+	sshClient.session.Close()
+	sshClient.client.Close()
+}
+
+// CopyFileToRemote function
+func (sshClient *SSH) CopyFileToRemote(file string, remotePath string, permission string) {
+
+	// Create a new SCP client
+	client := scp.NewClient(sshClient.Server, sshClient.sshConfig)
+
+	// Connect to the remote server
+	err := client.Connect()
+	if err != nil {
+		fmt.Println("Couldn't establish a connection to the remote server ", err)
+		return
+	}
+
+	// Open a file
+	f, _ := os.Open(file)
+
+	// Close client connection after the file has been copied
+	defer client.Close()
+
+	// Close the file after it has been copied
+	defer f.Close()
+
+	// Copy the file over
+	// Usage: CopyFile(fileReader, remotePath, permission)
+
+	err = client.CopyFile(f, remotePath, permission)
+
+	if err != nil {
+		fmt.Println("Error while copying file ", err)
+	}
 	sshClient.session.Close()
 	sshClient.client.Close()
 }
