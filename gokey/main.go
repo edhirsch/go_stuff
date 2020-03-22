@@ -218,7 +218,8 @@ func main() {
 
 	command, arg, err := getArgs()
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		showHelp()
+		os.Exit(1)
 	}
 	switch command {
 	case "help", "--help":

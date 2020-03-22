@@ -11,6 +11,7 @@ import (
 )
 
 type cliArgs struct {
+	scriptName   string
 	hostPattern  string
 	primaryLabel string
 	extraLabels  string
@@ -49,6 +50,8 @@ func readStdinPipe() string {
 
 func getArgs() (cliArgs, error) {
 	var cli cliArgs
+	scriptPathSlice := strings.Split(os.Args[0], "/")
+	cli.scriptName = scriptPathSlice[len(scriptPathSlice)-1]
 	args := os.Args[1:]
 	if len(args) < 2 {
 		return cli, errors.New("error: insufficient arguments")
@@ -89,14 +92,15 @@ func listMatchedHosts(nodes Nodes) {
 	printTabbedTable(lines)
 }
 
-func showHelp() {
+func showHelp(scriptName string) {
 	help := `Usage :
-	gorun <hosts> <command>
-	gorun <hosts> --commands
-	gorun <hosts> --exec <command>
-	gorun <hosts> --list
-	gorun <hosts> --play <script>
+	scriptName <hosts> <command>
+	scriptName <hosts> --commands
+	scriptName <hosts> --exec <command>
+	scriptName <hosts> --list
+	scriptName <hosts> --play <script>
 	`
+	help = strings.ReplaceAll(help, "scriptName", scriptName)
 	fmt.Println(help)
 }
 
@@ -125,8 +129,7 @@ func main() {
 
 	cli, err := getArgs()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		showHelp()
+		showHelp(cli.scriptName)
 		return
 	}
 
@@ -162,7 +165,7 @@ func main() {
 			fmt.Printf("\nCouldn't match any command using labels '%v'. \n", fullCommand)
 			fmt.Printf("Please check the commands files in '%v' for the list of available commands. \n\n", Config.CommandsFolder)
 			fmt.Printf("For running one time commands, you can use :\n")
-			fmt.Printf("gorun --exec '%v'\n\n", fullCommand)
+			fmt.Printf("%v --exec '%v'\n\n", cli.scriptName, fullCommand)
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			return
 		}
