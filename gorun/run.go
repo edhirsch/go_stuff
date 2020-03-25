@@ -36,7 +36,7 @@ func initCommands(commands []Command) {
 }
 
 func printTabbedTable(lines []string) {
-	writer := tabwriter.NewWriter(os.Stdout, 20, 8, 1, '\t', tabwriter.AlignRight)
+	writer := tabwriter.NewWriter(os.Stdout, 16, 8, 1, '\t', tabwriter.AlignRight)
 	for i := 0; i < len(lines); i++ {
 		fmt.Fprintln(writer, lines[i])
 	}
