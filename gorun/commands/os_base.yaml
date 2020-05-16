@@ -119,12 +119,15 @@ commands:
   cu=`sar 2> /dev/null | tail -2 | head -1 | awk "{print \\$4}"`; if [[ $cu == "" ]]; then cu="N/A"; fi;
   mu=`sar -r 2> /dev/null | tail -2 | head -1 | awk "{print \\$5}"`; if [[ $mu == "" ]]; then mu="N/A"; fi;
   dfr=`df -h / --output=pcent | sed 1d`; if [[ $dfr == "" ]]; then dfr="N/A"; fi; 
-  dfd=`df -h /var/lib/docker --output=pcent 2> /dev/null | sed 1d`; if [[ $dfd == "" ]]; then dfd="N/A"; fi;
+  dfd=`df -h /dev/mapper/docker--vg-docker --output=pcent 2> /dev/null | sed 1d`; if [[ $dfd == "" ]]; then dfd="N/A"; fi;
   ptynr=`cat /proc/sys/kernel/pty/nr`;
   ptymax=`cat /proc/sys/kernel/pty/max`;
-  echo -e "$h\t$p\t$t\t$cu\t$mu\t$dfr\t$dfd\t$ptynr/$ptymax"
+  nws10min=$(sar -n DEV | grep `route | grep "^default" | grep -o "[^ ]*\$"` | tail -n2 | head -n 1);
+  rx=`echo $nws10min | cut -d" " -f6`;
+  tx=`echo $nws10min | cut -d" " -f7`;
+  echo -e "$h\t$p\t$t\t$cu\t$mu\t$dfr\t$dfd\t$rx/$tx\t$ptynr/$ptymax"
   '
-    header: "HOSTNAME\tPROCESSES\tTHREADS\tCPU USAGE\tMEMORY USAGE\tDISK USAGE ROOT\tDISK USAGE DOCKER\tPTYs"
+    header: "HOSTNAME\tPROCESSES\tTHREADS\tCPU USAGE\tMEMORY USAGE\tDISK USAGE ROOT\tDISK USAGE DOCKER\tRX/TX KB/s\tPTYs"
     description: "Shows node status"
 
   - name: "install prerequisites"
