@@ -1,0 +1,20 @@
+commands:
+  - name: "docker containers"
+    command: "docker ps"
+    description: "Shows the list of running docker containers"
+
+  - name: "docker containers all"
+    command: "docker ps -a"
+    description: "Shows the list of all docker containers(running, started, stoppped and dead)"
+
+  - name: "docker containers count"
+    command: "docker ps | wc -l"
+    description: "Shows the count for running docker containers"
+
+  - name: "docker images"
+    command: "docker images"
+    description: "Shows the list of all docker image tags"
+
+  - name: "docker images all"
+    command: "docker images -a"
+    description: "Shows the list of all docker image SHAs"

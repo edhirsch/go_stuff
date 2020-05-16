@@ -1,0 +1,14 @@
+# Configuration file for gorun
+# ----------------------------
+# CommandsFolder  - the commands configuration files location
+# HostsFolder     - the hosts configuration files location
+# HostsFile       - the hosts configuration file location
+# AuthType        - ssh authentication type; options: 1 for password, 2 for key (future releases)
+# SummaryDetails  - command run summary details; options: all, failed-only or passed-only
+CommandsFolder: "commands"
+HostsFolder: "hosts"
+HostsFile: "*.yaml"
+SSHDefaultTimeout: 10
+CommandDefaultTimeout: 300
+AuthType: 1
+SummaryDetails: "failed-only"
