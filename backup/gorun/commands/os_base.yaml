@@ -1,0 +1,134 @@
+commands:
+# CPU
+  - name: "cpu count"
+    command: "cat /proc/cpuinfo | grep processor | wc -l"
+    description: "Shows the cpu cores count"
+
+  - name: "cpu usage"
+    command: 'sar 2> /dev/null | tail -2 | head -1 | awk "{print \$4}"'
+    description: "Shows the cpu utilization using sar. Requires sysstat service"
+
+  - name: "cpu top process"
+    command: "ps aux | sort -nr -k 3 | head -n 10"
+    description: "Shows the highest 10 cpu using processes"
+
+# Memory
+  - name: "memory size"
+    command: "vmstat -s -S M | grep 'total memory' | awk '{print $1}'"
+    description: "Shows the ram memory size"
+
+  - name: "memory usage sar"
+    command: 'sar -r 2> /dev/null | tail -2 | head -1 | awk "{print \$5}"'
+    description: "Shows the memory utilization using sar. Requires sysstat service"
+
+  - name: "memory usage"
+    command: "free -m"
+    description: "Shows memory usage"
+
+  - name: "memory top process"
+    command: "ps aux | sort -nr -k 4 | head -n 10"
+    description: "Shows the highest 10 memory using processes"
+
+# Disk
+  - name: "disk drives"
+    command: "fdisk -l | grep -E '^Disk /dev' | grep -v mapper"
+    description: "Shows physical disks"
+
+  - name: "disk partitions"
+    command: "fdisk -l | grep -E '^/dev' | grep -v mapper"
+    description: "Shows partitions on physical disks"
+
+  - name: "disk pv"
+    command: "pvs"
+    description: "Shows lvm physical volumes"
+
+  - name: "disk vg"
+    command: "vgs"
+    description: "Shows lvm volume groups"
+
+  - name: "disk lv"
+    command: "lvs"
+    description: "Shows lvm logical volumes"
+
+# File system
+  - name: "fs usage all"
+    command: "df -h"
+    description: "Shows file system details for root partition"
+
+  - name: "fs usage root"
+    command: "df -h /"
+    description: "Shows file system details for root partition"
+
+  - name: "fs usage docker"
+    command: "df -h /var/lib/docker"
+    description: "Shows file system details for docker partition"
+
+  - name: "fs mounts local"
+    command: 'mount | grep -E "^/dev" | grep -v nfs | sort'
+    description: "Shows file system local mounts"
+
+  - name: "fs mounts nfs"
+    command: 'mount | grep -E " nfs " | sort'
+    description: "Shows file system nfs mounts"
+
+  - name: "fs mounts count"
+    command: 'mount | wc -l'
+    description: "Shows file system mounts count"
+
+# Processes
+  - name: "process count"
+    command: "ps aux | wc -l"
+    description: "Shows the count for running process ids"
+
+  - name: "process list"
+    command: "ps aux"
+    description: "Shows the list of running process ids"
+
+  - name: "process tree"
+    command: "ps -ef --forest"
+    description: "Shows the list of running process ids in tree format"
+
+  - name: "process threads"
+    command: "ps -efT"
+    description: "Shows the list of running process ids in tree format"
+
+# Various
+  - name: "hostname"
+    command: "hostname"
+    description: "Shows the node hostname"
+
+  - name: "uptime"
+    command: 'uptime | cut -d\, -f1 | cut -d\  -f4,5'
+    description: "Shows the node uptime in days or hours:minutes"
+
+  - name: "info"
+    command: 'h=`hostname`;
+  u=`uptime | cut -d\, -f1 | cut -d\  -f4,5`;
+  k=`uname -r | cut -d\- -f1`;
+  cc=`cat /proc/cpuinfo | grep processor | wc -l`;
+  ms=`vmstat -s -S M | grep "total memory" | awk "{print \\$1}"`;
+  echo -e "$h\t$u\t$k\t$cc Cores\t$ms GB"
+  '
+    header: "HOSTNAME\tUPTIME\tKERNEL\tCPU COUNT\tMEMORY SIZE"
+    description: "Shows node info"
+
+  - name: "status"
+    command: 'h=`hostname`;
+  p=`ps aux | wc -l`;
+  t=`ps -efT | wc -l`
+  cu=`sar 2> /dev/null | tail -2 | head -1 | awk "{print \\$4}"`; if [[ $cu == "" ]]; then cu="N/A"; fi;
+  mu=`sar -r 2> /dev/null | tail -2 | head -1 | awk "{print \\$5}"`; if [[ $mu == "" ]]; then mu="N/A"; fi;
+  dfr=`df -h / --output=pcent | sed 1d`; if [[ $dfr == "" ]]; then dfr="N/A"; fi; 
+  dfd=`df -h /var/lib/docker --output=pcent 2> /dev/null | sed 1d`; if [[ $dfd == "" ]]; then dfd="N/A"; fi;
+  ptynr=`cat /proc/sys/kernel/pty/nr`;
+  ptymax=`cat /proc/sys/kernel/pty/max`;
+  echo -e "$h\t$p\t$t\t$cu\t$mu\t$dfr\t$dfd\t$ptynr/$ptymax"
+  '
+    header: "HOSTNAME\tPROCESSES\tTHREADS\tCPU USAGE\tMEMORY USAGE\tDISK USAGE ROOT\tDISK USAGE DOCKER\tPTYs"
+    description: "Shows node status"
+
+  - name: "install prerequisites"
+    command: 'systemctl status sysstat > /dev/null || bash -c "yum install -y sysstat && systemctl start sysstat ; systemctl enable sysstat"'
+    description: "Installs required packages and services"
+
+    

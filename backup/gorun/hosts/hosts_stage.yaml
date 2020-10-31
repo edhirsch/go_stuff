@@ -1,0 +1,16 @@
+nodes:
+  - server: "kick-stage-db1.cisco.com"
+  - server: "kick-stage-db2.cisco.com"
+  - server: "kick-stage-db3.cisco.com"
+  - server: "kick-stage-ctrl1.cisco.com"
+  - server: "kick-stage-ctrl2.cisco.com"
+  - server: "kick-stage-ctrl3.cisco.com"
+  - server: "kick-stage-data1.cisco.com"
+  - server: "kick-stage-data2.cisco.com"
+  - server: "kick-stage-data3.cisco.com"
+  - server: "kick-stage-data4.cisco.com"
+  - server: "kick-stage-data5.cisco.com"
+defaults:
+  port: "22"
+  user: "root"
+  password: '0oOVSCgG/QKUUtA9Lz6+idxMVfXUWsH1'
